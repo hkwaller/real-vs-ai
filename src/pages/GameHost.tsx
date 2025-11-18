@@ -141,17 +141,50 @@ const GameHost: React.FC = () => {
 
     if (existingCount && existingCount > 0) return;
 
-    // TODO: Fetch actual images from storage
-    // For now, using placeholders
-    const rounds = Array.from({ length: count }).map((_, i) => ({
-      game_id: gameId,
-      round_number: i + 1,
-      real_image_url: `https://picsum.photos/seed/real${i}/800/600`,
-      ai_image_url: `https://picsum.photos/seed/ai${i}/800/600?blur=2`, // Fake AI look
-      correct_option: Math.random() > 0.5 ? 'image1' : 'image2' // Randomize which position is real
-    }));
+    // Fetch images from storage (real folder)
+    const { data: files } = await supabase
+      .storage
+      .from('real-vs-ai')
+      .list('real');
 
-    await supabase.from('real_vs_ai_rounds').insert(rounds);
+    let roundsData;
+
+    if (files && files.length > 0) {
+      // Filter out .emptyFolderPlaceholder or hidden files if any
+      const validFiles = files.filter(f => f.name !== '.emptyFolderPlaceholder' && !f.name.startsWith('.'));
+      
+      // Shuffle and pick
+      const shuffled = validFiles.sort(() => 0.5 - Math.random());
+      // Loop if we need more rounds than images
+      const selected = [];
+      for (let i = 0; i < count; i++) {
+        selected.push(shuffled[i % shuffled.length]);
+      }
+
+      roundsData = selected.map((file, i) => {
+        const realUrl = supabase.storage.from('real-vs-ai').getPublicUrl(`real/${file.name}`).data.publicUrl;
+        const aiUrl = supabase.storage.from('real-vs-ai').getPublicUrl(`ai/${file.name}`).data.publicUrl;
+
+        return {
+          game_id: gameId,
+          round_number: i + 1,
+          real_image_url: realUrl,
+          ai_image_url: aiUrl,
+          correct_option: 'real' // Legacy field, logic uses deterministic ID
+        };
+      });
+    } else {
+      // Fallback to placeholders
+      roundsData = Array.from({ length: count }).map((_, i) => ({
+        game_id: gameId,
+        round_number: i + 1,
+        real_image_url: `https://picsum.photos/seed/real${i}/800/600`,
+        ai_image_url: `https://picsum.photos/seed/ai${i}/800/600?blur=2`,
+        correct_option: 'real'
+      }));
+    }
+
+    await supabase.from('real_vs_ai_rounds').insert(roundsData);
   };
 
   const loadRound = async (gameId: string, roundNum: number) => {
