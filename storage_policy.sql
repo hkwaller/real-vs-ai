@@ -11,6 +11,13 @@ on storage.objects for insert
 to public
 with check ( bucket_id = 'real-vs-ai' );
 
+-- Allow public access to update files in the 'real-vs-ai' bucket
+create policy "Allow public updating in real-vs-ai bucket"
+on storage.objects for update
+to public
+using ( bucket_id = 'real-vs-ai' )
+with check ( bucket_id = 'real-vs-ai' );
+
 -- Allow public access to delete files in the 'real-vs-ai' bucket
 create policy "Allow public deleting in real-vs-ai bucket"
 on storage.objects for delete

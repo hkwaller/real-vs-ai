@@ -1,27 +1,120 @@
-import React, { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import GameLayout from '@/components/GameLayout';
-import { supabase } from '@/lib/supabase';
-import { Loader2, UserPlus, Smile } from 'lucide-react';
+import React, { useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import GameLayout from '@/components/GameLayout'
+import { supabase } from '@/lib/supabase'
+import { Loader2, UserPlus, Smile } from 'lucide-react'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
-const EMOJIS = ['😀', '😎', '🤖', '👻', '👽', '👾', '🐱', '🐶', '🦊', '🦁', '🦄', '🐲'];
+const EMOJIS = [
+  '😀',
+  '😎',
+  '🤖',
+  '👻',
+  '👽',
+  '👾',
+  '🐱',
+  '🐶',
+  '🦊',
+  '🦁',
+  '🦄',
+  '🐲',
+  '😇',
+  '🤩',
+  '🥳',
+  '🤯',
+  '🤠',
+  '🤡',
+  '😈',
+  '👹',
+  '👺',
+  '🙈',
+  '🙉',
+  '🙊',
+  '🐼',
+  '🐻',
+  '🐨',
+  '🐯',
+  '🐷',
+  '🐸',
+  '🐒',
+  '🦍',
+  '🐔',
+  '🐧',
+  '🐦',
+  '🦉',
+  '🦋',
+  '🐢',
+  '🐍',
+  '🐙',
+  '🦀',
+  '🐠',
+  '🐳',
+  '🐬',
+  '🦖',
+  '🐉',
+  '🧚',
+  '🧜',
+  '🧙',
+  '🧛',
+  '🧟',
+  '🧞',
+  '🧑‍🚀',
+  '🧑‍🎤',
+  '🧑‍🎨',
+  '🧑‍💻',
+  '🧑‍🔬',
+  '🧑‍🎓',
+  '🧑‍🏫',
+  '🧑‍⚖️',
+  '🧑‍🌾',
+  '🧑‍🍳',
+  '🧑‍🔧',
+  '🧑‍🏭',
+  '🧑‍💼',
+  '🧑‍✈️',
+  '🧑‍🚒',
+  '👮',
+  '🕵️',
+  '💂',
+  '👷',
+  '🤴',
+  '👸',
+  '🤵',
+  '👰',
+  '👼',
+  '🎅',
+  '🦸',
+  '🦹',
+  '🧝',
+  '🧟‍♀️',
+  '🧞‍♂️',
+  '🧜‍♀️',
+  '🧚‍♂️',
+]
 
 const JoinGame: React.FC = () => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  
-  const [code, setCode] = useState(searchParams.get('code') || '');
-  const [name, setName] = useState('');
-  const [selectedEmoji, setSelectedEmoji] = useState(EMOJIS[0]);
-  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
+  const [code, setCode] = useState(searchParams.get('code') || '')
+  const [name, setName] = useState('')
+  const [selectedEmoji, setSelectedEmoji] = useState<string | undefined>(undefined)
+  const [loading, setLoading] = useState(false)
 
   const handleJoin = async () => {
-    if (!code || !name) return;
-    setLoading(true);
+    if (!code || !name) return
+    setLoading(true)
 
     try {
       // Check if game exists
@@ -29,12 +122,12 @@ const JoinGame: React.FC = () => {
         .from('real_vs_ai_games')
         .select('id')
         .eq('id', code.toUpperCase())
-        .single();
+        .single()
 
       if (gameError || !game) {
-        alert('Game not found!');
-        setLoading(false);
-        return;
+        alert('Game not found!')
+        setLoading(false)
+        return
       }
 
       // Join game
@@ -44,26 +137,26 @@ const JoinGame: React.FC = () => {
           {
             game_id: code.toUpperCase(),
             name: name,
-            emoji: selectedEmoji
-          }
+            emoji: selectedEmoji ?? EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+          },
         ])
         .select()
-        .single();
+        .single()
 
-      if (playerError) throw playerError;
+      if (playerError) throw playerError
 
       // Save player ID to local storage so we can identify them later
-      localStorage.setItem('real_vs_ai_player_id', player.id);
-      localStorage.setItem('real_vs_ai_game_id', code.toUpperCase());
+      localStorage.setItem('real_vs_ai_player_id', player.id)
+      localStorage.setItem('real_vs_ai_game_id', code.toUpperCase())
 
-      navigate(`/play/${code.toUpperCase()}`);
+      navigate(`/play/${code.toUpperCase()}`)
     } catch (error) {
-      console.error('Error joining game:', error);
-      alert('Failed to join game. Please try again.');
+      console.error('Error joining game:', error)
+      alert('Failed to join game. Please try again.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <GameLayout>
@@ -72,7 +165,7 @@ const JoinGame: React.FC = () => {
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-md mx-auto"
       >
-        <Card>
+        <Card className="text-white">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserPlus className="w-6 h-6 text-pink-400" />
@@ -102,48 +195,45 @@ const JoinGame: React.FC = () => {
                 className="bg-slate-900/50"
               />
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Smile className="w-4 h-4 text-muted-foreground" />
-                Choose Avatar
-              </label>
-              <div className="grid grid-cols-6 gap-2">
-                {EMOJIS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    onClick={() => setSelectedEmoji(emoji)}
-                    className={`text-2xl p-2 rounded-lg transition-all ${
-                      selectedEmoji === emoji 
-                        ? 'bg-indigo-500/20 ring-2 ring-indigo-500 scale-110' 
-                        : 'hover:bg-white/5'
-                    }`}
-                  >
-                    {emoji}
-                  </button>
-                ))}
+            <ScrollArea className="h-[200px]">
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Smile className="w-4 h-4 text-muted-foreground" />
+                  Choose Avatar
+                </label>
+                <div className="grid grid-cols-6 gap-2">
+                  {EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      onClick={() => setSelectedEmoji(emoji)}
+                      className={`text-2xl p-2 rounded-lg transition-all ${
+                        selectedEmoji === emoji
+                          ? 'bg-indigo-500/20 ring-2 ring-indigo-500 scale-110'
+                          : 'hover:bg-white/5'
+                      }`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            </ScrollArea>
           </CardContent>
           <CardFooter>
-            <Button 
-              variant="neon" 
-              size="lg" 
-              className="w-full" 
+            <Button
+              variant="neon"
+              size="lg"
+              className="w-full"
               onClick={handleJoin}
               disabled={loading || !code || !name}
             >
-              {loading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                'Join Game'
-              )}
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Join Game'}
             </Button>
           </CardFooter>
         </Card>
       </motion.div>
     </GameLayout>
-  );
-};
+  )
+}
 
-export default JoinGame;
+export default JoinGame

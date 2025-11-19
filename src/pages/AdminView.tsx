@@ -9,6 +9,7 @@ import {
   CardDescription,
   CardFooter,
 } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import GameLayout from '@/components/GameLayout'
 import { supabase } from '@/lib/supabase'
@@ -39,6 +40,9 @@ const AdminView: React.FC = () => {
   const [images, setImages] = useState<ImagePair[]>([])
   const [loadingImages, setLoadingImages] = useState(true)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [selectedPair, setSelectedPair] = useState<ImagePair | null>(null)
+  const [replacingAi, setReplacingAi] = useState<string | null>(null)
+  const replaceAiInputRef = useRef<HTMLInputElement>(null)
 
   const fetchImages = async () => {
     setLoadingImages(true)
@@ -95,7 +99,7 @@ const AdminView: React.FC = () => {
 
     try {
       const response = await fetch(
-        'https://n8n.srv1131293.hstgr.cloud/webhook-test/real-vs-ai/generate',
+        'https://n8n.srv1131293.hstgr.cloud/webhook/real-vs-ai/generate',
         {
           method: 'POST',
           headers: {
@@ -172,6 +176,37 @@ const AdminView: React.FC = () => {
     }
   }
 
+  const handleReplaceAiClick = (filename: string) => {
+    setReplacingAi(filename)
+    replaceAiInputRef.current?.click()
+  }
+
+  const handleReplaceAiFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0] || !replacingAi) return
+
+    const file = e.target.files[0]
+    const filename = replacingAi
+
+    try {
+      const { error } = await supabase.storage.from('real-vs-ai').upload(`ai/${filename}`, file, {
+        cacheControl: '0',
+        upsert: true,
+      })
+
+      if (error) throw error
+
+      // Refresh list
+      await fetchImages()
+      alert('AI Image replaced successfully!')
+    } catch (error) {
+      console.error('Error replacing AI image:', error)
+      alert('Failed to replace AI image')
+    } finally {
+      setReplacingAi(null)
+      if (replaceAiInputRef.current) replaceAiInputRef.current.value = ''
+    }
+  }
+
   return (
     <GameLayout>
       <div className="max-w-6xl mx-auto space-y-8">
@@ -182,7 +217,7 @@ const AdminView: React.FC = () => {
             {/* Upload Section */}
             <div className="lg:col-span-1 space-y-6">
               {/* Real Image Upload */}
-              <Card>
+              <Card className="text-white">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <ImageIcon className="w-5 h-5 text-indigo-400" />
@@ -265,7 +300,7 @@ const AdminView: React.FC = () => {
               </Card>
 
               {/* AI Image Upload */}
-              <Card>
+              <Card className="text-white">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <ImageIcon className="w-5 h-5 text-purple-400" />
@@ -315,12 +350,7 @@ const AdminView: React.FC = () => {
                     )}
                   </CardContent>
                   <CardFooter>
-                    <Button
-                      variant="outline"
-                      className="w-full border-purple-500/50 hover:bg-purple-500/10"
-                      type="submit"
-                      disabled={aiUploadLoading || !aiFile}
-                    >
+                    <Button className="w-full border-purple-500 bg-purple-500" type="submit">
                       {aiUploadLoading ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
@@ -335,7 +365,7 @@ const AdminView: React.FC = () => {
 
             {/* List Section */}
             <div className="lg:col-span-2">
-              <Card className="h-full">
+              <Card className="h-full text-white">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Existing Images</CardTitle>
@@ -359,25 +389,50 @@ const AdminView: React.FC = () => {
                       {images.map((img) => (
                         <div
                           key={img.name}
-                          className="bg-slate-900/50 rounded-lg p-3 border border-white/10 space-y-3"
+                          className="bg-slate-900/50 rounded-lg p-3 border border-white/10 space-y-3 cursor-pointer hover:border-indigo-500/50 transition-colors"
+                          onClick={() => setSelectedPair(img)}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="font-medium truncate flex-1" title={img.name}>
+                            <span
+                              className="font-medium truncate flex-1 text-white"
+                              title={img.name}
+                            >
                               {img.name}
                             </span>
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handleDelete(img.name)}
-                              disabled={deleting === img.name}
-                            >
-                              {deleting === img.name ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDelete(img.name)
+                                }}
+                                disabled={deleting === img.name}
+                              >
+                                {deleting === img.name ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 border-purple-500/50 hover:bg-purple-500/10 text-purple-400"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleReplaceAiClick(img.name)
+                                }}
+                                title="Replace AI Image"
+                              >
+                                {replacingAi === img.name ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
@@ -419,6 +474,49 @@ const AdminView: React.FC = () => {
           </div>
         </motion.div>
       </div>
+
+      <Dialog open={!!selectedPair} onOpenChange={(open) => !open && setSelectedPair(null)}>
+        <DialogContent className="max-w-4xl bg-slate-900 border-slate-800">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">{selectedPair?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-6 mt-4">
+            <div className="space-y-3">
+              <div className="text-center font-bold text-indigo-400 bg-indigo-500/10 py-2 rounded-lg">
+                Real Image
+              </div>
+              <div className="relative aspect-square rounded-xl overflow-hidden border-2 border-indigo-500/20">
+                <img
+                  src={selectedPair?.realUrl}
+                  className="w-full h-full object-contain bg-black/40"
+                  alt="Real"
+                />
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="text-center font-bold text-purple-400 bg-purple-500/10 py-2 rounded-lg">
+                AI Generated
+              </div>
+              <div className="relative aspect-square rounded-xl overflow-hidden border-2 border-purple-500/20">
+                <img
+                  src={selectedPair?.aiUrl}
+                  className="w-full h-full object-contain bg-black/40"
+                  alt="AI"
+                />
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden input for replacing AI image */}
+      <input
+        type="file"
+        ref={replaceAiInputRef}
+        onChange={handleReplaceAiFileChange}
+        accept="image/*"
+        className="hidden"
+      />
     </GameLayout>
   )
 }
