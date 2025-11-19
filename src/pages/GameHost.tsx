@@ -15,6 +15,7 @@ interface GameState {
   settings: {
     rounds: number
     timeLimit: number
+    revealMode?: 'instant' | 'after_round'
   }
 }
 
@@ -39,6 +40,7 @@ const GameHost: React.FC = () => {
   const [currentRound, setCurrentRound] = useState<Round | null>(null)
   const [timeLeft, setTimeLeft] = useState(0)
   const [showResult, setShowResult] = useState(false)
+  const [showScoreDialog, setShowScoreDialog] = useState(false)
   const [votes, setVotes] = useState<Record<string, string>>({})
   const [players, setPlayers] = useState<Player[]>([])
 
@@ -254,6 +256,7 @@ const GameHost: React.FC = () => {
     if (data) {
       setCurrentRound(data as Round)
       setShowResult(false)
+      setShowScoreDialog(false)
       setVotes({})
       setTimeLeft(gameState?.settings.timeLimit || 15)
 
@@ -289,6 +292,11 @@ const GameHost: React.FC = () => {
   const revealResult = async () => {
     if (showResult) return // Prevent double trigger
     setShowResult(true)
+    
+    // Only show dialog immediately if NOT in after_round mode
+    if (gameState?.settings.revealMode !== 'after_round') {
+      setShowScoreDialog(true)
+    }
 
     if (!currentRound || !code) return
 
@@ -334,7 +342,7 @@ const GameHost: React.FC = () => {
       }
     }
 
-    if (currentRound?.correct_option) {
+    if (currentRound?.correct_option && gameState?.settings.revealMode === 'instant') {
       confetti({
         particleCount: 100,
         spread: 70,
@@ -447,11 +455,33 @@ const GameHost: React.FC = () => {
           >
             {timeLeft}s
           </div>
-          <div className="flex items-center gap-2">
-            <Users className="w-6 h-6" />
-            <span className="text-xl">
-              {Object.keys(votes).length} / {players.length} Votes
-            </span>
+          <div className="flex items-center gap-4">
+            {gameState.settings.revealMode === 'after_round' && !showResult && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => revealResult()}
+                className="animate-pulse"
+              >
+                Finish Round
+              </Button>
+            )}
+            {gameState.settings.revealMode === 'after_round' && showResult && !showScoreDialog && (
+              <Button
+                variant="neon"
+                size="sm"
+                onClick={() => setShowScoreDialog(true)}
+                className="animate-bounce"
+              >
+                Show Scores
+              </Button>
+            )}
+            <div className="flex items-center gap-2">
+              <Users className="w-6 h-6" />
+              <span className="text-xl">
+                {Object.keys(votes).length} / {players.length} Votes
+              </span>
+            </div>
           </div>
         </div>
 
@@ -461,7 +491,7 @@ const GameHost: React.FC = () => {
           <div
             className={cn(
               'grid grid-cols-2 gap-8 h-full transition-all duration-500',
-              showResult ? 'opacity-40 scale-95 blur-sm' : 'opacity-100',
+              showResult && gameState.settings.revealMode === 'instant' ? 'opacity-40 scale-95 blur-sm' : 'opacity-100',
             )}
           >
             {/* Image A */}
@@ -482,15 +512,27 @@ const GameHost: React.FC = () => {
                 <AnimatePresence mode="popLayout">
                   {Object.entries(votes)
                     .filter(([_, choice]) => choice === 'A')
-                    .map(([pid, _]) => {
+                    .map(([pid, _], index) => {
                       const player = players.find((p) => p.id === pid)
                       if (!player) return null
+                      
+                      // In after_round mode, hide votes until result is shown
+                      if (gameState.settings.revealMode === 'after_round' && !showResult) {
+                        return null
+                      }
+
                       return (
                         <motion.div
                           key={pid}
                           initial={{ scale: 0, y: 20, opacity: 0 }}
                           animate={{ scale: 1, y: 0, opacity: 1 }}
                           exit={{ scale: 0, opacity: 0 }}
+                          transition={{
+                            type: 'spring',
+                            stiffness: 300,
+                            damping: 20,
+                            delay: gameState.settings.revealMode === 'after_round' ? index * 0.05 : 0
+                          }}
                           className="text-4xl drop-shadow-lg relative hover:z-30 hover:scale-125 transition-transform cursor-default"
                           title={player.name}
                         >
@@ -520,15 +562,27 @@ const GameHost: React.FC = () => {
                 <AnimatePresence mode="popLayout">
                   {Object.entries(votes)
                     .filter(([_, choice]) => choice === 'B')
-                    .map(([pid, _]) => {
+                    .map(([pid, _], index) => {
                       const player = players.find((p) => p.id === pid)
                       if (!player) return null
+
+                      // In after_round mode, hide votes until result is shown
+                      if (gameState.settings.revealMode === 'after_round' && !showResult) {
+                        return null
+                      }
+
                       return (
                         <motion.div
                           key={pid}
                           initial={{ scale: 0, y: 20, opacity: 0 }}
                           animate={{ scale: 1, y: 0, opacity: 1 }}
                           exit={{ scale: 0, opacity: 0 }}
+                          transition={{
+                            type: 'spring',
+                            stiffness: 300,
+                            damping: 20,
+                            delay: gameState.settings.revealMode === 'after_round' ? index * 0.05 : 0
+                          }}
                           className="text-4xl drop-shadow-lg relative hover:z-30 hover:scale-125 transition-transform cursor-default"
                           title={player.name}
                         >
@@ -543,7 +597,7 @@ const GameHost: React.FC = () => {
 
           {/* Result Overlay */}
           <AnimatePresence>
-            {showResult && (
+            {showScoreDialog && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}

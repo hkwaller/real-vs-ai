@@ -13,13 +13,14 @@ import {
 import { Input } from '@/components/ui/input'
 import GameLayout from '@/components/GameLayout'
 import { supabase } from '@/lib/supabase'
-import { Loader2, Settings, Clock, Images, Play } from 'lucide-react'
+import { Loader2, Settings, Clock, Images, Play, Eye, EyeOff } from 'lucide-react'
 
 const CreateGame: React.FC = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [rounds, setRounds] = useState<number | string>(5)
   const [timeLimit, setTimeLimit] = useState<number | string>(15)
+  const [revealMode, setRevealMode] = useState<'instant' | 'after_round'>('instant')
 
   const generateGameCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -42,6 +43,7 @@ const CreateGame: React.FC = () => {
           settings: {
             rounds: Number(rounds),
             timeLimit: Number(timeLimit),
+            revealMode,
           },
           current_round: 0,
         },
@@ -104,6 +106,40 @@ const CreateGame: React.FC = () => {
                 onChange={(e) => setTimeLimit(e.target.value)}
                 className="bg-slate-900/50"
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                {revealMode === 'instant' ? (
+                  <Eye className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <EyeOff className="w-4 h-4 text-muted-foreground" />
+                )}
+                Reveal Answers
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={revealMode === 'instant' ? 'neon' : 'outline'}
+                  onClick={() => setRevealMode('instant')}
+                  className={`w-full ${revealMode === 'instant' ? 'text-white' : 'text-black'}`}
+                >
+                  Instantly
+                </Button>
+                <Button
+                  type="button"
+                  variant={revealMode === 'after_round' ? 'neon' : 'outline'}
+                  onClick={() => setRevealMode('after_round')}
+                  className={`w-full ${revealMode === 'after_round' ? 'text-white' : 'text-black'}`}
+                >
+                  After Round
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {revealMode === 'instant'
+                  ? 'Votes are shown as they happen.'
+                  : 'Votes are hidden until the round ends.'}
+              </p>
             </div>
           </CardContent>
           <CardFooter>

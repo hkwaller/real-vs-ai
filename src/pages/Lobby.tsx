@@ -110,7 +110,7 @@ const Lobby: React.FC = () => {
           animate={{ opacity: 1, x: 0 }}
           className="flex flex-col h-full"
         >
-          <Card className="flex-1 flex flex-col">
+          <Card className="flex-1 flex flex-col text-white">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center gap-2">

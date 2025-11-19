@@ -115,7 +115,7 @@ const PlayerGame: React.FC = () => {
       <GameLayout>
         <Card className="text-center p-10">
           <Trophy className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold mb-2">Game Over!</h1>
+          <h1 className="text-3xl font-bold mb-2 text-white">Game Over!</h1>
           <p className="text-muted-foreground">Check the main screen for results.</p>
           <Button className="mt-6" onClick={() => navigate('/')} variant="outline">Exit</Button>
         </Card>
