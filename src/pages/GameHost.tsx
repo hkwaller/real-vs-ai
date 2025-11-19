@@ -292,7 +292,7 @@ const GameHost: React.FC = () => {
   const revealResult = async () => {
     if (showResult) return // Prevent double trigger
     setShowResult(true)
-    
+
     // Only show dialog immediately if NOT in after_round mode
     if (gameState?.settings.revealMode !== 'after_round') {
       setShowScoreDialog(true)
@@ -491,7 +491,9 @@ const GameHost: React.FC = () => {
           <div
             className={cn(
               'grid grid-cols-2 gap-8 h-full transition-all duration-500',
-              showResult && gameState.settings.revealMode === 'instant' ? 'opacity-40 scale-95 blur-sm' : 'opacity-100',
+              showResult && gameState.settings.revealMode === 'instant'
+                ? 'opacity-40 scale-95 blur-sm'
+                : 'opacity-100',
             )}
           >
             {/* Image A */}
@@ -508,40 +510,46 @@ const GameHost: React.FC = () => {
                 )}
               />
               {/* Emojis for A */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex -space-x-4 z-20 px-4 py-2 bg-black/30 backdrop-blur-sm rounded-full border border-white/10 min-h-[60px] items-center justify-center">
-                <AnimatePresence mode="popLayout">
-                  {Object.entries(votes)
-                    .filter(([_, choice]) => choice === 'A')
-                    .map(([pid, _], index) => {
-                      const player = players.find((p) => p.id === pid)
-                      if (!player) return null
-                      
-                      // In after_round mode, hide votes until result is shown
-                      if (gameState.settings.revealMode === 'after_round' && !showResult) {
-                        return null
-                      }
+              <AnimatePresence mode="popLayout">
+                {showResult &&
+                  Object.entries(votes).filter(([_, choice]) => choice === 'A').length > 0 && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex -space-x-4 z-20 px-4 py-2 bg-black/30 backdrop-blur-sm rounded-full border border-white/10 min-h-[60px] items-center justify-center">
+                      {Object.entries(votes)
+                        .filter(([_, choice]) => choice === 'A')
+                        .map(([pid, _], index) => {
+                          const player = players.find((p) => p.id === pid)
+                          if (!player) return null
 
-                      return (
-                        <motion.div
-                          key={pid}
-                          initial={{ scale: 0, y: 20, opacity: 0 }}
-                          animate={{ scale: 1, y: 0, opacity: 1 }}
-                          exit={{ scale: 0, opacity: 0 }}
-                          transition={{
-                            type: 'spring',
-                            stiffness: 300,
-                            damping: 20,
-                            delay: gameState.settings.revealMode === 'after_round' ? index * 0.05 : 0
-                          }}
-                          className="text-4xl drop-shadow-lg relative hover:z-30 hover:scale-125 transition-transform cursor-default"
-                          title={player.name}
-                        >
-                          {player.emoji}
-                        </motion.div>
-                      )
-                    })}
-                </AnimatePresence>
-              </div>
+                          // In after_round mode, hide votes until result is shown
+                          if (gameState.settings.revealMode === 'after_round' && !showResult) {
+                            return null
+                          }
+
+                          return (
+                            <motion.div
+                              key={pid}
+                              initial={{ scale: 0, y: 20, opacity: 0 }}
+                              animate={{ scale: 1, y: 0, opacity: 1 }}
+                              exit={{ scale: 0, opacity: 0 }}
+                              transition={{
+                                type: 'spring',
+                                stiffness: 300,
+                                damping: 20,
+                                delay:
+                                  gameState.settings.revealMode === 'after_round'
+                                    ? index * 0.05
+                                    : 0,
+                              }}
+                              className="text-4xl drop-shadow-lg relative hover:z-30 hover:scale-125 transition-transform cursor-default"
+                              title={player.name}
+                            >
+                              {player.emoji}
+                            </motion.div>
+                          )
+                        })}
+                    </div>
+                  )}
+              </AnimatePresence>
             </div>
 
             {/* Image B */}
@@ -558,40 +566,46 @@ const GameHost: React.FC = () => {
                 )}
               />
               {/* Emojis for B */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex -space-x-4 z-20 px-4 py-2 bg-black/30 backdrop-blur-sm rounded-full border border-white/10 min-h-[60px] items-center justify-center">
-                <AnimatePresence mode="popLayout">
-                  {Object.entries(votes)
-                    .filter(([_, choice]) => choice === 'B')
-                    .map(([pid, _], index) => {
-                      const player = players.find((p) => p.id === pid)
-                      if (!player) return null
+              <AnimatePresence mode="popLayout">
+                {showResult &&
+                  Object.entries(votes).filter(([_, choice]) => choice === 'B').length > 0 && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex -space-x-4 z-20 px-4 py-2 bg-black/30 backdrop-blur-sm rounded-full border border-white/10 min-h-[60px] items-center justify-center">
+                      {Object.entries(votes)
+                        .filter(([_, choice]) => choice === 'B')
+                        .map(([pid, _], index) => {
+                          const player = players.find((p) => p.id === pid)
+                          if (!player) return null
 
-                      // In after_round mode, hide votes until result is shown
-                      if (gameState.settings.revealMode === 'after_round' && !showResult) {
-                        return null
-                      }
+                          // In after_round mode, hide votes until result is shown
+                          if (gameState.settings.revealMode === 'after_round' && !showResult) {
+                            return null
+                          }
 
-                      return (
-                        <motion.div
-                          key={pid}
-                          initial={{ scale: 0, y: 20, opacity: 0 }}
-                          animate={{ scale: 1, y: 0, opacity: 1 }}
-                          exit={{ scale: 0, opacity: 0 }}
-                          transition={{
-                            type: 'spring',
-                            stiffness: 300,
-                            damping: 20,
-                            delay: gameState.settings.revealMode === 'after_round' ? index * 0.05 : 0
-                          }}
-                          className="text-4xl drop-shadow-lg relative hover:z-30 hover:scale-125 transition-transform cursor-default"
-                          title={player.name}
-                        >
-                          {player.emoji}
-                        </motion.div>
-                      )
-                    })}
-                </AnimatePresence>
-              </div>
+                          return (
+                            <motion.div
+                              key={pid}
+                              initial={{ scale: 0, y: 20, opacity: 0 }}
+                              animate={{ scale: 1, y: 0, opacity: 1 }}
+                              exit={{ scale: 0, opacity: 0 }}
+                              transition={{
+                                type: 'spring',
+                                stiffness: 300,
+                                damping: 20,
+                                delay:
+                                  gameState.settings.revealMode === 'after_round'
+                                    ? index * 0.05
+                                    : 0,
+                              }}
+                              className="text-4xl drop-shadow-lg relative hover:z-30 hover:scale-125 transition-transform cursor-default"
+                              title={player.name}
+                            >
+                              {player.emoji}
+                            </motion.div>
+                          )
+                        })}
+                    </div>
+                  )}
+              </AnimatePresence>
             </div>
           </div>
 
