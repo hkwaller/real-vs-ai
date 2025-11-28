@@ -137,6 +137,14 @@ const GameHost: React.FC = () => {
     }
   }, [votes, players, showResult, currentRound])
 
+  useEffect(() => {
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Space') {
+        revealResult()
+      }
+    })
+  }, [])
+
   // Timer logic
   useEffect(() => {
     if (timeLeft > 0 && !showResult) {
@@ -467,12 +475,7 @@ const GameHost: React.FC = () => {
               </Button>
             )}
             {gameState.settings.revealMode === 'after_round' && showResult && !showScoreDialog && (
-              <Button
-                variant="neon"
-                size="sm"
-                onClick={() => setShowScoreDialog(true)}
-                className="animate-bounce"
-              >
+              <Button variant="neon" size="sm" onClick={() => setShowScoreDialog(true)}>
                 Show Scores
               </Button>
             )}
