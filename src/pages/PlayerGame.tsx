@@ -165,7 +165,7 @@ const PlayerGame: React.FC = () => {
             </motion.button>
           </div>
         ) : (
-          <Card className="w-full text-center py-10 border-0">
+          <Card className="w-full text-center py-10">
             <div className="flex flex-col items-center gap-4">
               <CheckCircle className="w-16 h-16 text-green-400" />
               <div>

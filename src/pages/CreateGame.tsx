@@ -18,7 +18,7 @@ import { Loader2, Settings, Clock, Images, Play, Eye, EyeOff } from 'lucide-reac
 const CreateGame: React.FC = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
-  const [rounds, setRounds] = useState<number | string>(5)
+  const [rounds, setRounds] = useState<number | string>(10)
   const [timeLimit, setTimeLimit] = useState<number | string>(15)
   const [revealMode, setRevealMode] = useState<'instant' | 'after_round'>('instant')
 
