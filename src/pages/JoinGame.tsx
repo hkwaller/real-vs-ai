@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import GameLayout from '@/components/GameLayout'
-import { supabase } from '@/lib/supabase'
 import { Loader2, UserPlus, Smile } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
@@ -112,50 +111,19 @@ const JoinGame: React.FC = () => {
   const [selectedEmoji, setSelectedEmoji] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(false)
 
-  const handleJoin = async () => {
+  const handleJoin = () => {
     if (!code || !name) return
     setLoading(true)
 
-    try {
-      // Check if game exists
-      const { data: game, error: gameError } = await supabase
-        .from('real_vs_ai_games')
-        .select('id')
-        .eq('id', code.toUpperCase())
-        .single()
+    const upperCode = code.toUpperCase()
+    const resolvedEmoji = selectedEmoji ?? EMOJIS[Math.floor(Math.random() * EMOJIS.length)]
+    const playerId = crypto.randomUUID()
 
-      if (gameError || !game) {
-        alert('Game not found!')
-        setLoading(false)
-        return
-      }
+    sessionStorage.setItem('rvai_player_id', playerId)
+    sessionStorage.setItem('rvai_player_name', name)
+    sessionStorage.setItem('rvai_player_emoji', resolvedEmoji)
 
-      // Join game
-      const { data: player, error: playerError } = await supabase
-        .from('real_vs_ai_players')
-        .insert([
-          {
-            game_id: code.toUpperCase(),
-            name: name,
-            emoji: selectedEmoji ?? EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
-          },
-        ])
-        .select()
-        .single()
-
-      if (playerError) throw playerError
-
-      // Save player ID to local storage so we can identify them later
-      localStorage.setItem('real_vs_ai_player_id', player.id)
-      localStorage.setItem('real_vs_ai_game_id', code.toUpperCase())
-
-      navigate(`/play/${code.toUpperCase()}`)
-    } catch (error) {
-      console.error('Error joining game:', error)
-      alert('Failed to join game. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    navigate(`/play/${upperCode}`)
   }
 
   return (

@@ -99,7 +99,7 @@ const AdminView: React.FC = () => {
 
     try {
       const response = await fetch(
-        'https://n8n.srv1131293.hstgr.cloud/webhook/real-vs-ai/generate',
+        'https://n8n.srv1131293.hstgr.cloud/webhook-test/real-vs-ai/generate',
         {
           method: 'POST',
           headers: {

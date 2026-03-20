@@ -1,75 +1,53 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import GameLayout from '@/components/GameLayout';
-import { supabase } from '@/lib/supabase';
 import { Users, Play, Check } from 'lucide-react';
+import {
+  RoomProvider,
+  useOthers,
+  useMutation,
+  LiveList,
+  LiveMap,
+  LiveObject,
+} from '@/liveblocks.config';
 
-interface Player {
-  id: string;
-  name: string;
-  emoji: string;
-  game_id: string;
-  score: number;
+interface GameSettings {
+  rounds: number;
+  timeLimit: number;
+  revealMode: 'instant' | 'after_round';
 }
 
-const Lobby: React.FC = () => {
-  const { code } = useParams<{ code: string }>();
+// Inner component that uses Liveblocks hooks
+const LobbyContent: React.FC<{ code: string }> = ({ code }) => {
   const navigate = useNavigate();
-  const [players, setPlayers] = useState<Player[]>([]);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (!code) return;
+  // Real-time player list from Liveblocks presence (non-host connections)
+  const others = useOthers();
+  const players = others
+    .filter((o) => !o.presence.isHost)
+    .map((o) => ({
+      id: o.presence.playerId,
+      name: o.presence.name,
+      emoji: o.presence.emoji,
+    }));
 
-    // Fetch initial players
-    const fetchPlayers = async () => {
-      const { data } = await supabase
-        .from('real_vs_ai_players')
-        .select('*')
-        .eq('game_id', code);
-      if (data) setPlayers(data as Player[]);
-    };
-
-    fetchPlayers();
-
-    // Subscribe to new players
-    const channel = supabase
-      .channel('lobby_players')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'real_vs_ai_players',
-        filter: `game_id=eq.${code}`
-      }, (payload) => {
-        setPlayers((current) => [...current, payload.new as Player]);
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [code]);
+  const startGame = useMutation(({ storage }) => {
+    storage.get('gameStatus').set('value', 'playing');
+  }, []);
 
   const copyCode = () => {
-    if (code) {
-      navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const startGame = async () => {
-    if (!code) return;
-    // Update game status to playing
-    await supabase
-      .from('real_vs_ai_games')
-      .update({ status: 'playing' })
-      .eq('id', code);
-    
+  const handleStart = () => {
+    startGame();
     navigate(`/game/${code}`);
   };
 
@@ -79,7 +57,7 @@ const Lobby: React.FC = () => {
     <GameLayout>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl">
         {/* Left Column: Game Info & QR */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           className="space-y-6"
@@ -87,13 +65,17 @@ const Lobby: React.FC = () => {
           <Card className="h-full flex flex-col justify-center items-center text-center p-8 space-y-6">
             <div>
               <h2 className="text-xl text-muted-foreground uppercase tracking-widest mb-2">Join Code</h2>
-              <div 
+              <div
                 className="text-7xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 cursor-pointer hover:scale-105 transition-transform"
                 onClick={copyCode}
               >
                 {code}
               </div>
-              {copied && <span className="text-green-400 text-sm flex items-center justify-center gap-1 mt-2"><Check className="w-3 h-3"/> Copied!</span>}
+              {copied && (
+                <span className="text-green-400 text-sm flex items-center justify-center gap-1 mt-2">
+                  <Check className="w-3 h-3" /> Copied!
+                </span>
+              )}
             </div>
 
             <div className="p-4 bg-white rounded-xl shadow-2xl shadow-indigo-500/20">
@@ -105,7 +87,7 @@ const Lobby: React.FC = () => {
         </motion.div>
 
         {/* Right Column: Player List */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           className="flex flex-col h-full"
@@ -147,11 +129,11 @@ const Lobby: React.FC = () => {
               </div>
             </CardContent>
             <CardFooter className="pt-6">
-              <Button 
-                variant="neon" 
-                size="xl" 
-                className="w-full" 
-                onClick={startGame}
+              <Button
+                variant="neon"
+                size="xl"
+                className="w-full"
+                onClick={handleStart}
                 disabled={players.length === 0}
               >
                 <Play className="mr-2 h-5 w-5" />
@@ -162,6 +144,48 @@ const Lobby: React.FC = () => {
         </motion.div>
       </div>
     </GameLayout>
+  );
+};
+
+// Outer component that mounts RoomProvider
+const Lobby: React.FC = () => {
+  const { code } = useParams<{ code: string }>();
+  const location = useLocation();
+  const settings = (location.state as GameSettings | null) ?? {
+    rounds: 10,
+    timeLimit: 15,
+    revealMode: 'instant' as const,
+  };
+
+  if (!code) return null;
+
+  return (
+    <RoomProvider
+      id={code}
+      initialPresence={{
+        name: 'Host',
+        emoji: '👑',
+        playerId: 'host',
+        isHost: true,
+        hasVoted: false,
+        currentVote: null,
+      }}
+      initialStorage={{
+        gameStatus: new LiveObject({ value: 'waiting' }),
+        settings: new LiveObject({
+          rounds: settings.rounds,
+          timeLimit: settings.timeLimit,
+          revealMode: settings.revealMode,
+        }),
+        currentRoundIndex: new LiveObject({ value: 0 }),
+        rounds: new LiveList([]),
+        votes: new LiveMap(),
+        scores: new LiveMap(),
+        players: new LiveList([]),
+      }}
+    >
+      <LobbyContent code={code} />
+    </RoomProvider>
   );
 };
 

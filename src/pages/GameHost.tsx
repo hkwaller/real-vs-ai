@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -8,174 +8,109 @@ import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { Users, Trophy, Crown } from 'lucide-react'
 import confetti from 'canvas-confetti'
+import {
+  RoomProvider,
+  useOthers,
+  useStorage,
+  useMutation,
+  useBroadcastEvent,
+  LiveList,
+  LiveMap,
+  LiveObject,
+} from '@/liveblocks.config'
 
-interface GameState {
-  status: 'playing' | 'finished'
-  current_round: number
-  settings: {
-    rounds: number
-    timeLimit: number
-    revealMode?: 'instant' | 'after_round'
-  }
-}
+type RoundData = { id: string; realImageUrl: string; aiImageUrl: string }
 
-interface Round {
-  id: string
-  real_image_url: string
-  ai_image_url: string
-  correct_option: 'real' | 'ai'
-  round_number: number
-}
-
-interface Player {
-  id: string
-  name: string
-  score: number
-  emoji: string
-}
-
-const GameHost: React.FC = () => {
-  const { code } = useParams<{ code: string }>()
-  const [gameState, setGameState] = useState<GameState | null>(null)
-  const [currentRound, setCurrentRound] = useState<Round | null>(null)
+// Inner component — all game logic lives here
+const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const [timeLeft, setTimeLeft] = useState(0)
   const [showResult, setShowResult] = useState(false)
   const [showScoreDialog, setShowScoreDialog] = useState(false)
-  const [votes, setVotes] = useState<Record<string, string>>({})
-  const [players, setPlayers] = useState<Player[]>([])
+  const [initialized, setInitialized] = useState(false)
 
-  // Initialize game and rounds
-  useEffect(() => {
-    if (!code) return
+  // Liveblocks storage
+  const roundsStorage = useStorage((root) => root.rounds)
+  const currentRoundIndexObj = useStorage((root) => root.currentRoundIndex)
+  const gameStatusObj = useStorage((root) => root.gameStatus)
+  const settingsObj = useStorage((root) => root.settings)
+  const storedPlayers = useStorage((root) => root.players)
+  const scores = useStorage((root) => root.scores)
 
-    const initGame = async () => {
-      // Get game details
-      const { data: game } = await supabase
-        .from('real_vs_ai_games')
-        .select('*')
-        .eq('id', code)
-        .single()
+  // Presence
+  const others = useOthers()
 
-      if (game) {
-        setGameState(game as GameState)
+  const broadcast = useBroadcastEvent()
 
-        // Fetch players immediately to know total count
-        const { data: currentPlayers } = await supabase
-          .from('real_vs_ai_players')
-          .select('*')
-          .eq('game_id', code)
-
-        if (currentPlayers) {
-          setPlayers(currentPlayers as Player[])
-        }
-
-        // Generate rounds if not exists (simplified: just checking if we have rounds)
-        const { count } = await supabase
-          .from('real_vs_ai_rounds')
-          .select('*', { count: 'exact', head: true })
-          .eq('game_id', code)
-
-        if (count === 0) {
-          await generateRounds(code, game.settings.rounds)
-        }
-
-        loadRound(code, game.current_round || 1)
+  // Derived values
+  const currentRoundIndex = currentRoundIndexObj?.value ?? 0
+  const gameStatus = gameStatusObj?.value
+  const settings = settingsObj
+    ? {
+        rounds: settingsObj.rounds,
+        timeLimit: settingsObj.timeLimit,
+        revealMode: settingsObj.revealMode,
       }
-    }
+    : null
 
-    initGame()
+  const currentRound: RoundData | null = roundsStorage?.[currentRoundIndex] ?? null
 
-    // Subscribe to votes and new players
-    const channel = supabase
-      .channel('game_host')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'real_vs_ai_votes',
-          filter: `game_id=eq.${code}`,
-        },
-        (payload) => {
-          setVotes((prev) => {
-            const newVotes = { ...prev, [payload.new.player_id]: payload.new.choice }
-            return newVotes
-          })
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'real_vs_ai_players',
-          filter: `game_id=eq.${code}`,
-        },
-        (payload) => {
-          setPlayers((prev) => [...prev, payload.new as Player])
-        },
-      )
-      .subscribe()
+  // Votes derived from presence (non-host players who have voted)
+  const votes = useMemo(() => {
+    const map: Record<string, 'A' | 'B'> = {}
+    others
+      .filter((o) => !o.presence.isHost && o.presence.hasVoted && o.presence.currentVote)
+      .forEach((o) => {
+        map[o.presence.playerId] = o.presence.currentVote!
+      })
+    return map
+  }, [others])
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [code])
+  // Players with scores for leaderboard
+  const players = useMemo(() => {
+    if (!storedPlayers || !scores) return []
+    return [...storedPlayers]
+      .map((p) => ({ ...p, score: scores.get(p.id) ?? 0 }))
+      .sort((a, b) => b.score - a.score)
+  }, [storedPlayers, scores])
 
-  // Auto-finish round when all players have voted
-  useEffect(() => {
-    if (
-      players.length > 0 &&
-      Object.keys(votes).length === players.length &&
-      !showResult &&
-      currentRound
-    ) {
-      // Small delay to let the last animation play
-      setTimeout(() => {
-        revealResult()
-      }, 1000)
-    }
-  }, [votes, players, showResult, currentRound])
-
-  useEffect(() => {
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Space') {
-        revealResult()
-      }
-    })
+  // Mutations
+  const storeRounds = useMutation(({ storage }, data: RoundData[]) => {
+    const roundsList = storage.get('rounds')
+    data.forEach((r) => roundsList.push(r))
   }, [])
 
-  // Timer logic
-  useEffect(() => {
-    if (timeLeft > 0 && !showResult) {
-      const timer = setInterval(() => setTimeLeft((t) => t - 1), 1000)
-      return () => clearInterval(timer)
-    } else if (timeLeft === 0 && !showResult && currentRound) {
-      revealResult()
-    }
-  }, [timeLeft, showResult, currentRound])
+  const advanceRound = useMutation(({ storage }, index: number) => {
+    storage.get('currentRoundIndex').set('value', index)
+  }, [])
 
-  const generateRounds = async (gameId: string, count: number) => {
-    // Double check if rounds exist to prevent race conditions
-    const { count: existingCount } = await supabase
-      .from('real_vs_ai_rounds')
-      .select('*', { count: 'exact', head: true })
-      .eq('game_id', gameId)
+  const updateScores = useMutation(
+    ({ storage }, updates: { playerId: string; increment: number }[]) => {
+      const scoreMap = storage.get('scores')
+      for (const { playerId, increment } of updates) {
+        if (increment > 0) {
+          const current = scoreMap.get(playerId) ?? 0
+          scoreMap.set(playerId, current + increment)
+        }
+      }
+    },
+    [],
+  )
 
-    if (existingCount && existingCount > 0) return
+  const finishGame = useMutation(({ storage }) => {
+    storage.get('gameStatus').set('value', 'finished')
+  }, [])
 
-    // Fetch images from storage (real folder)
+  // Generate rounds from Supabase Storage and store in Liveblocks
+  const generateRoundsAsync = async (count: number) => {
     const { data: files } = await supabase.storage.from('real-vs-ai').list('real')
 
-    let roundsData
+    let roundsData: RoundData[]
 
     if (files && files.length > 0) {
-      // Filter out .emptyFolderPlaceholder or hidden files if any
       const validFiles = files.filter(
         (f) => f.name !== '.emptyFolderPlaceholder' && !f.name.startsWith('.'),
       )
 
-      // Filter out images shown today
       const today = new Date().toISOString().split('T')[0]
       const history = JSON.parse(
         localStorage.getItem('real_vs_ai_shown_images') || '{"date": "", "images": []}',
@@ -186,199 +121,158 @@ const GameHost: React.FC = () => {
         availableFiles = validFiles.filter((f) => !history.images.includes(f.name))
       }
 
-      // If we don't have enough fresh images, fallback to all valid files
       if (availableFiles.length < count) {
-        console.log('Not enough fresh images, falling back to all images')
         availableFiles = validFiles
       }
 
-      // Shuffle and pick
       const shuffled = availableFiles.sort(() => 0.5 - Math.random())
-      // Loop if we need more rounds than images
       const selected = []
       for (let i = 0; i < count; i++) {
         selected.push(shuffled[i % shuffled.length])
       }
 
-      roundsData = selected.map((file, i) => {
-        const realUrl = supabase.storage.from('real-vs-ai').getPublicUrl(`real/${file.name}`)
-          .data.publicUrl
-        const aiUrl = supabase.storage.from('real-vs-ai').getPublicUrl(`ai/${file.name}`)
-          .data.publicUrl
+      roundsData = selected.map((file) => ({
+        id: crypto.randomUUID(),
+        realImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`real/${file.name}`)
+          .data.publicUrl,
+        aiImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`ai/${file.name}`)
+          .data.publicUrl,
+      }))
 
-        return {
-          game_id: gameId,
-          round_number: i + 1,
-          real_image_url: realUrl,
-          ai_image_url: aiUrl,
-          correct_option: 'real', // Legacy field, logic uses deterministic ID
-        }
-      })
+      // Update localStorage with used image names
+      const today2 = new Date().toISOString().split('T')[0]
+      let hist = JSON.parse(
+        localStorage.getItem('real_vs_ai_shown_images') || '{"date": "", "images": []}',
+      )
+      if (hist.date !== today2) hist = { date: today2, images: [] }
+      const newImages = selected.map((f) => f.name)
+      hist.images = [...new Set([...hist.images, ...newImages])]
+      localStorage.setItem('real_vs_ai_shown_images', JSON.stringify(hist))
     } else {
-      // Fallback to placeholders
       roundsData = Array.from({ length: count }).map((_, i) => ({
-        game_id: gameId,
-        round_number: i + 1,
-        real_image_url: `https://picsum.photos/seed/real${i}/800/600`,
-        ai_image_url: `https://picsum.photos/seed/ai${i}/800/600?blur=2`,
-        correct_option: 'real',
+        id: crypto.randomUUID(),
+        realImageUrl: `https://picsum.photos/seed/real${i}/800/600`,
+        aiImageUrl: `https://picsum.photos/seed/ai${i}/800/600?blur=2`,
       }))
     }
 
-    await supabase.from('real_vs_ai_rounds').insert(roundsData)
-
-    // Update local storage with used images
-    if (roundsData && roundsData.length > 0) {
-      const today = new Date().toISOString().split('T')[0]
-      let history = JSON.parse(
-        localStorage.getItem('real_vs_ai_shown_images') || '{"date": "", "images": []}',
-      )
-
-      if (history.date !== today) {
-        history = { date: today, images: [] }
-      }
-
-      const newImages = roundsData
-        .map((r) => {
-          // Extract filename from URL
-          const url = r.real_image_url
-          const filename = url.split('/').pop()
-          return filename
-        })
-        .filter(Boolean)
-
-      history.images = [...new Set([...history.images, ...newImages])]
-      localStorage.setItem('real_vs_ai_shown_images', JSON.stringify(history))
-    }
+    storeRounds(roundsData)
+    setTimeLeft(settings?.timeLimit ?? 15)
   }
 
-  const loadRound = async (gameId: string, roundNum: number) => {
-    const { data } = await supabase
-      .from('real_vs_ai_rounds')
-      .select('*')
-      .eq('game_id', gameId)
-      .eq('round_number', roundNum)
-      .limit(1)
-      .maybeSingle()
+  // Initialize: generate rounds once storage is loaded
+  useEffect(() => {
+    if (initialized || roundsStorage === null || settings === null) return
+    setInitialized(true)
 
-    if (data) {
-      setCurrentRound(data as Round)
-      setShowResult(false)
-      setShowScoreDialog(false)
-      setVotes({})
-      setTimeLeft(gameState?.settings.timeLimit || 15)
-
-      // Update game state
-      await supabase.from('real_vs_ai_games').update({ current_round: roundNum }).eq('id', gameId)
-
-      // Preload next round images
-      preloadNextRound(gameId, roundNum + 1)
+    if (roundsStorage.length === 0) {
+      generateRoundsAsync(settings.rounds)
     } else {
-      // Game Over
-      setGameState((prev) => (prev ? { ...prev, status: 'finished' } : null))
-      await supabase.from('real_vs_ai_games').update({ status: 'finished' }).eq('id', gameId)
+      setTimeLeft(settings.timeLimit)
     }
-  }
+  }, [roundsStorage, settings, initialized])
 
-  const preloadNextRound = async (gameId: string, nextRoundNum: number) => {
-    const { data } = await supabase
-      .from('real_vs_ai_rounds')
-      .select('real_image_url, ai_image_url')
-      .eq('game_id', gameId)
-      .eq('round_number', nextRoundNum)
-      .limit(1)
-      .maybeSingle()
+  // Reset state when current round changes (track by round ID)
+  const prevRoundIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!currentRound || currentRound.id === prevRoundIdRef.current) return
+    prevRoundIdRef.current = currentRound.id
 
-    if (data) {
+    setShowResult(false)
+    setShowScoreDialog(false)
+    setTimeLeft(settings?.timeLimit ?? 15)
+    preloadNextRound(currentRoundIndex + 1)
+  }, [currentRound?.id])
+
+  // Auto-reveal when all players vote
+  useEffect(() => {
+    const playerCount = storedPlayers?.length ?? 0
+    const voteCount = Object.keys(votes).length
+    if (playerCount > 0 && voteCount === playerCount && !showResult && currentRound) {
+      const timeout = setTimeout(() => revealResultRef.current(), 1000)
+      return () => clearTimeout(timeout)
+    }
+  }, [votes, storedPlayers, showResult, currentRound])
+
+  // Timer
+  useEffect(() => {
+    if (timeLeft > 0 && !showResult) {
+      const timer = setInterval(() => setTimeLeft((t) => t - 1), 1000)
+      return () => clearInterval(timer)
+    } else if (timeLeft === 0 && !showResult && currentRound && initialized) {
+      revealResultRef.current()
+    }
+  }, [timeLeft, showResult, currentRound, initialized])
+
+  // Space key to reveal
+  const revealResultRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.code === 'Space') revealResultRef.current()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
+
+  const preloadNextRound = (nextIndex: number) => {
+    const nextRound = roundsStorage?.[nextIndex]
+    if (nextRound) {
       const img1 = new Image()
-      img1.src = data.real_image_url
+      img1.src = nextRound.realImageUrl
       const img2 = new Image()
-      img2.src = data.ai_image_url
+      img2.src = nextRound.aiImageUrl
     }
   }
 
-  const revealResult = async () => {
-    if (showResult) return // Prevent double trigger
+  const revealResult = () => {
+    if (showResult) return
     setShowResult(true)
 
-    // Only show dialog immediately if NOT in after_round mode
-    if (gameState?.settings.revealMode !== 'after_round') {
+    if (settings?.revealMode !== 'after_round') {
       setShowScoreDialog(true)
     }
 
-    if (!currentRound || !code) return
+    if (!currentRound) return
 
     const isRealLeft = currentRound.id.charCodeAt(0) % 2 === 0
     const correctChoice = isRealLeft ? 'A' : 'B'
 
-    // Fetch all votes for this round
-    const { data: roundVotes } = await supabase
-      .from('real_vs_ai_votes')
-      .select('*')
-      .eq('game_id', code)
-      .eq('round_id', currentRound.id)
+    const updates = Object.entries(votes).map(([playerId, choice]) => ({
+      playerId,
+      increment: choice === correctChoice ? 100 : 0,
+    }))
 
-    if (roundVotes) {
-      // Calculate score updates
-      const updates = roundVotes.map((vote) => {
-        const isCorrect = vote.choice === correctChoice
-        return {
-          id: vote.player_id,
-          score_increment: isCorrect ? 100 : 0,
-        }
-      })
+    updateScores(updates)
 
-      // Update players scores
-      for (const update of updates) {
-        if (update.score_increment > 0) {
-          await supabase.rpc('real_vs_ai_increment_score', {
-            row_id: update.id,
-            amount: update.score_increment,
-          })
-        }
-      }
-
-      // Fetch updated leaderboard
-      const { data: updatedPlayers } = await supabase
-        .from('real_vs_ai_players')
-        .select('*')
-        .eq('game_id', code)
-        .order('score', { ascending: false })
-
-      if (updatedPlayers) {
-        setPlayers(updatedPlayers as Player[])
-      }
-    }
-
-    if (currentRound?.correct_option && gameState?.settings.revealMode === 'instant') {
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-      })
+    if (settings?.revealMode === 'instant') {
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
     }
   }
+
+  // Keep ref current so keydown and effects always call the latest version
+  revealResultRef.current = revealResult
 
   const nextRound = () => {
-    if (gameState && currentRound) {
-      loadRound(code!, currentRound.round_number + 1)
+    const nextIndex = currentRoundIndex + 1
+    if (!roundsStorage || nextIndex >= roundsStorage.length) {
+      finishGame()
+      broadcast({ type: 'GAME_OVER' })
+    } else {
+      advanceRound(nextIndex)
     }
   }
 
-  if (!gameState || !currentRound)
+  // Loading state
+  if (!gameStatus || !currentRound) {
     return <div className="text-white text-center p-10">Loading game...</div>
+  }
 
-  if (gameState.status === 'finished') {
-    // Save high scores to local storage as backup
+  // Game over
+  if (gameStatus === 'finished') {
     if (players.length > 0) {
       const history = JSON.parse(localStorage.getItem('real_vs_ai_history') || '[]')
-      const gameRecord = {
-        date: new Date().toISOString(),
-        gameId: code,
-        scores: players,
-      }
-      // Avoid duplicates
-      if (!history.some((h: any) => h.gameId === code)) {
+      const gameRecord = { date: new Date().toISOString(), gameId: code, scores: players }
+      if (!history.some((h: { gameId: string }) => h.gameId === code)) {
         history.push(gameRecord)
         localStorage.setItem('real_vs_ai_history', JSON.stringify(history))
       }
@@ -441,9 +335,13 @@ const GameHost: React.FC = () => {
   }
 
   const isRealLeft = currentRound.id.charCodeAt(0) % 2 === 0
+  const leftImage = isRealLeft ? currentRound.realImageUrl : currentRound.aiImageUrl
+  const rightImage = isRealLeft ? currentRound.aiImageUrl : currentRound.realImageUrl
 
-  const leftImage = isRealLeft ? currentRound.real_image_url : currentRound.ai_image_url
-  const rightImage = isRealLeft ? currentRound.ai_image_url : currentRound.real_image_url
+  // Build a flat players lookup for emoji display
+  const playerLookup = new Map(
+    (storedPlayers ?? []).map((p) => [p.id, { ...p, score: scores?.get(p.id) ?? 0 }]),
+  )
 
   return (
     <GameLayout className="max-w-6xl">
@@ -451,7 +349,7 @@ const GameHost: React.FC = () => {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div className="text-2xl font-bold">
-            Round {currentRound.round_number} / {gameState.settings.rounds}
+            Round {currentRoundIndex + 1} / {settings?.rounds ?? '?'}
           </div>
           <div
             className={cn(
@@ -464,7 +362,7 @@ const GameHost: React.FC = () => {
             {timeLeft}s
           </div>
           <div className="flex items-center gap-4">
-            {gameState.settings.revealMode === 'after_round' && !showResult && (
+            {settings?.revealMode === 'after_round' && !showResult && (
               <Button
                 variant="destructive"
                 size="sm"
@@ -474,7 +372,7 @@ const GameHost: React.FC = () => {
                 Finish Round
               </Button>
             )}
-            {gameState.settings.revealMode === 'after_round' && showResult && !showScoreDialog && (
+            {settings?.revealMode === 'after_round' && showResult && !showScoreDialog && (
               <Button variant="neon" size="sm" onClick={() => setShowScoreDialog(true)}>
                 Show Scores
               </Button>
@@ -482,19 +380,18 @@ const GameHost: React.FC = () => {
             <div className="flex items-center gap-2">
               <Users className="w-6 h-6" />
               <span className="text-xl">
-                {Object.keys(votes).length} / {players.length} Votes
+                {Object.keys(votes).length} / {storedPlayers?.length ?? 0} Votes
               </span>
             </div>
           </div>
         </div>
 
-        {/* Main Content Area: Images or Leaderboard */}
+        {/* Main Content Area: Images */}
         <div className="flex-1 min-h-[500px] relative">
-          {/* Images Layer */}
           <div
             className={cn(
               'grid grid-cols-2 gap-8 h-full transition-all duration-500',
-              showResult && gameState.settings.revealMode === 'instant'
+              showResult && settings?.revealMode === 'instant'
                 ? 'opacity-40 scale-95 blur-sm'
                 : 'opacity-100',
             )}
@@ -512,7 +409,6 @@ const GameHost: React.FC = () => {
                   showResult && !isRealLeft ? 'border-red-500' : '',
                 )}
               />
-              {/* Emojis for A */}
               <AnimatePresence mode="popLayout">
                 {showResult &&
                   Object.entries(votes).filter(([_, choice]) => choice === 'A').length > 0 && (
@@ -520,14 +416,8 @@ const GameHost: React.FC = () => {
                       {Object.entries(votes)
                         .filter(([_, choice]) => choice === 'A')
                         .map(([pid, _], index) => {
-                          const player = players.find((p) => p.id === pid)
+                          const player = playerLookup.get(pid)
                           if (!player) return null
-
-                          // In after_round mode, hide votes until result is shown
-                          if (gameState.settings.revealMode === 'after_round' && !showResult) {
-                            return null
-                          }
-
                           return (
                             <motion.div
                               key={pid}
@@ -539,9 +429,7 @@ const GameHost: React.FC = () => {
                                 stiffness: 300,
                                 damping: 20,
                                 delay:
-                                  gameState.settings.revealMode === 'after_round'
-                                    ? index * 0.05
-                                    : 0,
+                                  settings?.revealMode === 'after_round' ? index * 0.05 : 0,
                               }}
                               className="text-4xl drop-shadow-lg relative hover:z-30 hover:scale-125 transition-transform cursor-default"
                               title={player.name}
@@ -568,7 +456,6 @@ const GameHost: React.FC = () => {
                   showResult && isRealLeft ? 'border-red-500' : '',
                 )}
               />
-              {/* Emojis for B */}
               <AnimatePresence mode="popLayout">
                 {showResult &&
                   Object.entries(votes).filter(([_, choice]) => choice === 'B').length > 0 && (
@@ -576,14 +463,8 @@ const GameHost: React.FC = () => {
                       {Object.entries(votes)
                         .filter(([_, choice]) => choice === 'B')
                         .map(([pid, _], index) => {
-                          const player = players.find((p) => p.id === pid)
+                          const player = playerLookup.get(pid)
                           if (!player) return null
-
-                          // In after_round mode, hide votes until result is shown
-                          if (gameState.settings.revealMode === 'after_round' && !showResult) {
-                            return null
-                          }
-
                           return (
                             <motion.div
                               key={pid}
@@ -595,9 +476,7 @@ const GameHost: React.FC = () => {
                                 stiffness: 300,
                                 damping: 20,
                                 delay:
-                                  gameState.settings.revealMode === 'after_round'
-                                    ? index * 0.05
-                                    : 0,
+                                  settings?.revealMode === 'after_round' ? index * 0.05 : 0,
                               }}
                               className="text-4xl drop-shadow-lg relative hover:z-30 hover:scale-125 transition-transform cursor-default"
                               title={player.name}
@@ -667,6 +546,38 @@ const GameHost: React.FC = () => {
         </div>
       </div>
     </GameLayout>
+  )
+}
+
+// Outer component — mounts RoomProvider
+const GameHost: React.FC = () => {
+  const { code } = useParams<{ code: string }>()
+
+  if (!code) return null
+
+  return (
+    <RoomProvider
+      id={code}
+      initialPresence={{
+        name: 'Host',
+        emoji: '👑',
+        playerId: 'host',
+        isHost: true,
+        hasVoted: false,
+        currentVote: null,
+      }}
+      initialStorage={{
+        gameStatus: new LiveObject({ value: 'waiting' }),
+        settings: new LiveObject({ rounds: 10, timeLimit: 15, revealMode: 'instant' }),
+        currentRoundIndex: new LiveObject({ value: 0 }),
+        rounds: new LiveList([]),
+        votes: new LiveMap(),
+        scores: new LiveMap(),
+        players: new LiveList([]),
+      }}
+    >
+      <GameHostContent code={code} />
+    </RoomProvider>
   )
 }
 

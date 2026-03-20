@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import GameLayout from '@/components/GameLayout'
-import { supabase } from '@/lib/supabase'
 import { Loader2, Settings, Clock, Images, Play, Eye, EyeOff } from 'lucide-react'
 
 const CreateGame: React.FC = () => {
@@ -31,35 +30,16 @@ const CreateGame: React.FC = () => {
     return code
   }
 
-  const handleCreateGame = async () => {
+  const handleCreateGame = () => {
     setLoading(true)
     const code = generateGameCode()
-
-    try {
-      const { error } = await supabase.from('real_vs_ai_games').insert([
-        {
-          id: code,
-          status: 'waiting',
-          settings: {
-            rounds: Number(rounds),
-            timeLimit: Number(timeLimit),
-            revealMode,
-          },
-          current_round: 0,
-        },
-      ])
-
-      if (error) throw error
-
-      // Also create the rounds now? Or later?
-      // For now, let's just go to lobby. We can generate rounds when starting the game.
-      navigate(`/lobby/${code}`)
-    } catch (error) {
-      console.error('Error creating game:', error)
-      alert('Failed to create game. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    navigate(`/lobby/${code}`, {
+      state: {
+        rounds: Number(rounds),
+        timeLimit: Number(timeLimit),
+        revealMode,
+      },
+    })
   }
 
   return (

@@ -4,113 +4,82 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import GameLayout from '@/components/GameLayout'
-import { supabase } from '@/lib/supabase'
 import { Loader2, CheckCircle, Trophy } from 'lucide-react'
+import {
+  RoomProvider,
+  useStorage,
+  useMutation,
+  useUpdateMyPresence,
+  LiveList,
+  LiveMap,
+  LiveObject,
+} from '@/liveblocks.config'
 
-interface GameState {
-  status: 'playing' | 'finished'
-  current_round: number
-}
-
-interface Round {
-  id: string
-  round_number: number
-  correct_option: 'real' | 'ai' // Not used here, but part of schema
-}
-
-const PlayerGame: React.FC = () => {
-  const { code } = useParams<{ code: string }>()
+// Inner component — uses Liveblocks hooks
+const PlayerGameContent: React.FC<{ playerId: string; playerName: string; playerEmoji: string }> = ({
+  playerId,
+  playerName,
+  playerEmoji,
+}) => {
   const navigate = useNavigate()
-  const [gameState, setGameState] = useState<GameState | null>(null)
-  const [currentRound, setCurrentRound] = useState<Round | null>(null)
   const [hasVoted, setHasVoted] = useState(false)
   const [voteChoice, setVoteChoice] = useState<'A' | 'B' | null>(null)
-  const [playerId, setPlayerId] = useState<string | null>(null)
+
+  const updatePresence = useUpdateMyPresence()
+
+  // Liveblocks storage
+  const gameStatus = useStorage((root) => root.gameStatus?.value ?? null)
+  const currentRoundIndexObj = useStorage((root) => root.currentRoundIndex)
+  const rounds = useStorage((root) => root.rounds)
+  const settingsRounds = useStorage((root) => root.settings?.rounds ?? 0)
+
+  const currentRoundIndex = currentRoundIndexObj?.value ?? 0
+  const currentRound = rounds?.[currentRoundIndex] ?? null
+
+  // Register player in Storage on mount (deduplicates by playerId)
+  const registerPlayer = useMutation(
+    ({ storage }) => {
+      const playerList = storage.get('players')
+      const scoreMap = storage.get('scores')
+      for (let i = 0; i < playerList.length; i++) {
+        if (playerList.get(i)?.id === playerId) return // already registered
+      }
+      playerList.push({ id: playerId, name: playerName, emoji: playerEmoji })
+      scoreMap.set(playerId, 0)
+    },
+    [playerId, playerName, playerEmoji],
+  )
 
   useEffect(() => {
-    const pid = localStorage.getItem('real_vs_ai_player_id')
-    if (!pid) {
-      navigate('/')
-      return
-    }
-    setPlayerId(pid)
+    registerPlayer()
+  }, [])
 
-    // Subscribe to game changes
-    const gameChannel = supabase
-      .channel('player_game')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'real_vs_ai_games',
-          filter: `id=eq.${code}`,
-        },
-        (payload) => {
-          const newGame = payload.new as GameState
-          setGameState(newGame)
+  // Reset vote state when round changes
+  useEffect(() => {
+    setHasVoted(false)
+    setVoteChoice(null)
+    updatePresence({ hasVoted: false, currentVote: null })
+  }, [currentRoundIndex])
 
-          // If round changed, reset state
-          if (newGame.current_round !== gameState?.current_round) {
-            fetchRound(newGame.current_round)
-          }
-        },
-      )
-      .subscribe()
-
-    // Initial fetch
-    const fetchGame = async () => {
-      const { data } = await supabase.from('real_vs_ai_games').select('*').eq('id', code).single()
-
-      if (data) {
-        setGameState(data as GameState)
-        fetchRound(data.current_round)
+  // Soft validation: if settings.rounds is 0 after 5s, game code was likely invalid
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (settingsRounds === 0) {
+        navigate('/join?error=notfound')
       }
-    }
+    }, 5000)
+    return () => clearTimeout(id)
+  }, [settingsRounds])
 
-    fetchGame()
-
-    return () => {
-      supabase.removeChannel(gameChannel)
-    }
-  }, [code, navigate])
-
-  const fetchRound = async (roundNum: number) => {
-    if (roundNum === 0) return // Game hasn't started properly or is in lobby
-
-    const { data } = await supabase
-      .from('real_vs_ai_rounds')
-      .select('*')
-      .eq('game_id', code)
-      .eq('round_number', roundNum)
-      .limit(1)
-      .maybeSingle()
-
-    if (data) {
-      setCurrentRound(data as Round)
-      setHasVoted(false)
-      setVoteChoice(null)
-    }
-  }
-
-  const handleVote = async (choice: 'A' | 'B') => {
-    if (!playerId || !currentRound || !code) return
-
+  const handleVote = (choice: 'A' | 'B') => {
+    if (hasVoted) return
     setVoteChoice(choice)
     setHasVoted(true)
-
-    // Send vote
-    await supabase.from('real_vs_ai_votes').insert({
-      game_id: code,
-      round_id: currentRound.id,
-      player_id: playerId,
-      choice: choice,
-    })
+    updatePresence({ hasVoted: true, currentVote: choice })
   }
 
-  if (!gameState) return <div className="text-white text-center p-10">Loading...</div>
-
-  if (gameState.status === 'finished') {
+  // Game over
+  if (gameStatus === 'finished') {
     return (
       <GameLayout>
         <Card className="text-center p-10">
@@ -125,13 +94,20 @@ const PlayerGame: React.FC = () => {
     )
   }
 
-  if (gameState.status !== 'playing' || !currentRound) {
+  // Waiting (game not started or between rounds)
+  if (gameStatus !== 'playing' || !currentRound) {
     return (
       <GameLayout>
         <Card className="text-center p-10 border-0">
           <Loader2 className="w-12 h-12 text-indigo-400 mx-auto mb-4 animate-spin" />
           <h1 className="text-2xl font-bold">Waiting for Host...</h1>
           <p className="text-muted-foreground mt-2">Get ready!</p>
+          <button
+            onClick={() => navigate('/join')}
+            className="mt-6 text-xs text-muted-foreground underline underline-offset-4"
+          >
+            Wrong game code? Go back
+          </button>
         </Card>
       </GameLayout>
     )
@@ -141,7 +117,7 @@ const PlayerGame: React.FC = () => {
     <GameLayout>
       <div className="flex flex-col items-center space-y-8 w-full max-w-md mx-auto">
         <div className="text-center">
-          <h2 className="text-xl font-medium text-indigo-300">Round {currentRound.round_number}</h2>
+          <h2 className="text-xl font-medium text-indigo-300">Round {currentRoundIndex + 1}</h2>
           <h1 className="text-3xl font-bold mt-2">Which is REAL?</h1>
         </div>
 
@@ -178,6 +154,47 @@ const PlayerGame: React.FC = () => {
         )}
       </div>
     </GameLayout>
+  )
+}
+
+// Outer component — mounts RoomProvider
+const PlayerGame: React.FC = () => {
+  const { code } = useParams<{ code: string }>()
+  const navigate = useNavigate()
+
+  const playerId = sessionStorage.getItem('rvai_player_id')
+  const playerName = sessionStorage.getItem('rvai_player_name') ?? ''
+  const playerEmoji = sessionStorage.getItem('rvai_player_emoji') ?? '😀'
+
+  useEffect(() => {
+    if (!playerId) navigate('/join')
+  }, [playerId, navigate])
+
+  if (!playerId || !code) return null
+
+  return (
+    <RoomProvider
+      id={code}
+      initialPresence={{
+        name: playerName,
+        emoji: playerEmoji,
+        playerId,
+        isHost: false,
+        hasVoted: false,
+        currentVote: null,
+      }}
+      initialStorage={{
+        gameStatus: new LiveObject({ value: 'waiting' }),
+        settings: new LiveObject({ rounds: 0, timeLimit: 15, revealMode: 'instant' }),
+        currentRoundIndex: new LiveObject({ value: 0 }),
+        rounds: new LiveList([]),
+        votes: new LiveMap(),
+        scores: new LiveMap(),
+        players: new LiveList([]),
+      }}
+    >
+      <PlayerGameContent playerId={playerId} playerName={playerName} playerEmoji={playerEmoji} />
+    </RoomProvider>
   )
 }
 
