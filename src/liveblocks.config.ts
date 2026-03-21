@@ -41,6 +41,7 @@ export const {
   useMutation,
   useEventListener,
   useBroadcastEvent,
+  useStatus,
 } = createRoomContext<Presence, Storage, never, RoomEvent>(client);
 
 export { LiveList, LiveMap, LiveObject };

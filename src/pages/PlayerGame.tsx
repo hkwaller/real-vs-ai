@@ -24,19 +24,19 @@ const PlayerGameContent: React.FC<{ playerId: string; playerName: string; player
   const navigate = useNavigate()
   const [hasVoted, setHasVoted] = useState(false)
   const [voteChoice, setVoteChoice] = useState<'A' | 'B' | null>(null)
+  const [registered, setRegistered] = useState(false)
 
   const updatePresence = useUpdateMyPresence()
 
-  // Liveblocks storage
+  // Liveblocks storage — null while loading, value once hydrated
   const gameStatus = useStorage((root) => root.gameStatus?.value ?? null)
   const currentRoundIndexObj = useStorage((root) => root.currentRoundIndex)
   const rounds = useStorage((root) => root.rounds)
-  const settingsRounds = useStorage((root) => root.settings?.rounds ?? 0)
 
   const currentRoundIndex = currentRoundIndexObj?.value ?? 0
   const currentRound = rounds?.[currentRoundIndex] ?? null
 
-  // Register player in Storage on mount (deduplicates by playerId)
+  // Register player in Storage once storage has loaded (deduplicates by playerId)
   const registerPlayer = useMutation(
     ({ storage }) => {
       const playerList = storage.get('players')
@@ -50,9 +50,12 @@ const PlayerGameContent: React.FC<{ playerId: string; playerName: string; player
     [playerId, playerName, playerEmoji],
   )
 
+  // Wait for storage to hydrate (gameStatus !== null) before registering
   useEffect(() => {
+    if (registered || gameStatus === null) return
+    setRegistered(true)
     registerPlayer()
-  }, [])
+  }, [gameStatus, registered])
 
   // Reset vote state when round changes
   useEffect(() => {
@@ -60,16 +63,6 @@ const PlayerGameContent: React.FC<{ playerId: string; playerName: string; player
     setVoteChoice(null)
     updatePresence({ hasVoted: false, currentVote: null })
   }, [currentRoundIndex])
-
-  // Soft validation: if settings.rounds is 0 after 5s, game code was likely invalid
-  useEffect(() => {
-    const id = setTimeout(() => {
-      if (settingsRounds === 0) {
-        navigate('/join?error=notfound')
-      }
-    }, 5000)
-    return () => clearTimeout(id)
-  }, [settingsRounds])
 
   const handleVote = (choice: 'A' | 'B') => {
     if (hasVoted) return
@@ -162,13 +155,13 @@ const PlayerGame: React.FC = () => {
   const { code } = useParams<{ code: string }>()
   const navigate = useNavigate()
 
-  const playerId = sessionStorage.getItem('rvai_player_id')
-  const playerName = sessionStorage.getItem('rvai_player_name') ?? ''
-  const playerEmoji = sessionStorage.getItem('rvai_player_emoji') ?? '😀'
+  const playerId = localStorage.getItem('rvai_player_id')
+  const playerName = localStorage.getItem('rvai_player_name') ?? ''
+  const playerEmoji = localStorage.getItem('rvai_player_emoji') ?? '😀'
 
   useEffect(() => {
-    if (!playerId) navigate('/join')
-  }, [playerId, navigate])
+    if (!playerId) navigate(`/join${code ? `?code=${code}` : ''}`)
+  }, [playerId, navigate, code])
 
   if (!playerId || !code) return null
 
@@ -185,7 +178,7 @@ const PlayerGame: React.FC = () => {
       }}
       initialStorage={{
         gameStatus: new LiveObject({ value: 'waiting' }),
-        settings: new LiveObject({ rounds: 0, timeLimit: 15, revealMode: 'instant' }),
+        settings: new LiveObject({ rounds: 10, timeLimit: 15, revealMode: 'instant' }),
         currentRoundIndex: new LiveObject({ value: 0 }),
         rounds: new LiveList([]),
         votes: new LiveMap(),

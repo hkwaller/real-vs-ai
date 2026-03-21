@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
@@ -10,6 +10,7 @@ import {
   RoomProvider,
   useOthers,
   useMutation,
+  useStatus,
   LiveList,
   LiveMap,
   LiveObject,
@@ -22,7 +23,7 @@ interface GameSettings {
 }
 
 // Inner component that uses Liveblocks hooks
-const LobbyContent: React.FC<{ code: string }> = ({ code }) => {
+const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code, settings }) => {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
 
@@ -36,6 +37,27 @@ const LobbyContent: React.FC<{ code: string }> = ({ code }) => {
       emoji: o.presence.emoji,
     }));
 
+  // Gate mutations on WebSocket being fully connected
+  const status = useStatus();
+  const isReady = status === 'connected';
+
+  // Actively write settings to storage once connected — don't rely on initialStorage,
+  // which is ignored if a stale room already exists on the Liveblocks server.
+  const writeSettings = useMutation(
+    ({ storage }, s: GameSettings) => {
+      const settingsObj = storage.get('settings');
+      settingsObj.set('rounds', s.rounds);
+      settingsObj.set('timeLimit', s.timeLimit);
+      settingsObj.set('revealMode', s.revealMode);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!isReady) return;
+    writeSettings(settings);
+  }, [isReady]);
+
   const startGame = useMutation(({ storage }) => {
     storage.get('gameStatus').set('value', 'playing');
   }, []);
@@ -47,6 +69,7 @@ const LobbyContent: React.FC<{ code: string }> = ({ code }) => {
   };
 
   const handleStart = () => {
+    if (!isReady) return;
     startGame();
     navigate(`/game/${code}`);
   };
@@ -134,7 +157,7 @@ const LobbyContent: React.FC<{ code: string }> = ({ code }) => {
                 size="xl"
                 className="w-full"
                 onClick={handleStart}
-                disabled={players.length === 0}
+                disabled={players.length === 0 || !isReady}
               >
                 <Play className="mr-2 h-5 w-5" />
                 Start Game
@@ -184,7 +207,7 @@ const Lobby: React.FC = () => {
         players: new LiveList([]),
       }}
     >
-      <LobbyContent code={code} />
+      <LobbyContent code={code} settings={settings} />
     </RoomProvider>
   );
 };

@@ -14,6 +14,7 @@ import {
   useStorage,
   useMutation,
   useBroadcastEvent,
+  useStatus,
   LiveList,
   LiveMap,
   LiveObject,
@@ -27,6 +28,9 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const [showResult, setShowResult] = useState(false)
   const [showScoreDialog, setShowScoreDialog] = useState(false)
   const [initialized, setInitialized] = useState(false)
+
+  // Connection status — mutations require 'connected'
+  const status = useStatus()
 
   // Liveblocks storage
   const roundsStorage = useStorage((root) => root.rounds)
@@ -160,9 +164,9 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     setTimeLeft(settings?.timeLimit ?? 15)
   }
 
-  // Initialize: generate rounds once storage is loaded
+  // Initialize: generate rounds once WebSocket is connected and storage is loaded
   useEffect(() => {
-    if (initialized || roundsStorage === null || settings === null) return
+    if (initialized || status !== 'connected' || roundsStorage === null || settings === null) return
     setInitialized(true)
 
     if (roundsStorage.length === 0) {
@@ -170,7 +174,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     } else {
       setTimeLeft(settings.timeLimit)
     }
-  }, [roundsStorage, settings, initialized])
+  }, [status, roundsStorage, settings, initialized])
 
   // Reset state when current round changes (track by round ID)
   const prevRoundIdRef = useRef<string | null>(null)
@@ -184,15 +188,16 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     preloadNextRound(currentRoundIndex + 1)
   }, [currentRound?.id])
 
-  // Auto-reveal when all players vote
+  // Auto-reveal when all present players have voted (use presence — always in sync with vote map)
   useEffect(() => {
-    const playerCount = storedPlayers?.length ?? 0
-    const voteCount = Object.keys(votes).length
-    if (playerCount > 0 && voteCount === playerCount && !showResult && currentRound) {
-      const timeout = setTimeout(() => revealResultRef.current(), 1000)
+    const presentPlayers = others.filter((o) => !o.presence.isHost)
+    const totalPlayers = presentPlayers.length
+    const totalVoted = presentPlayers.filter((o) => o.presence.hasVoted).length
+    if (totalPlayers > 0 && totalVoted === totalPlayers && !showResult && currentRound) {
+      const timeout = setTimeout(() => revealResultRef.current(), 500)
       return () => clearTimeout(timeout)
     }
-  }, [votes, storedPlayers, showResult, currentRound])
+  }, [others, showResult, currentRound])
 
   // Timer
   useEffect(() => {
@@ -229,7 +234,8 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     setShowResult(true)
 
     if (settings?.revealMode !== 'after_round') {
-      setShowScoreDialog(true)
+      // Delay score dialog so host can see vote emojis + correct/wrong borders briefly
+      setTimeout(() => setShowScoreDialog(true), 2000)
     }
 
     if (!currentRound) return
@@ -244,7 +250,8 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
 
     updateScores(updates)
 
-    if (settings?.revealMode === 'instant') {
+    const anyCorrect = updates.some((u) => u.increment > 0)
+    if (anyCorrect) {
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
     }
   }
@@ -391,9 +398,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
           <div
             className={cn(
               'grid grid-cols-2 gap-8 h-full transition-all duration-500',
-              showResult && settings?.revealMode === 'instant'
-                ? 'opacity-40 scale-95 blur-sm'
-                : 'opacity-100',
+              showScoreDialog ? 'opacity-40 scale-95 blur-sm' : 'opacity-100',
             )}
           >
             {/* Image A */}
@@ -410,7 +415,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                 )}
               />
               <AnimatePresence mode="popLayout">
-                {showResult &&
+                {(showResult || settings?.revealMode === 'instant') &&
                   Object.entries(votes).filter(([_, choice]) => choice === 'A').length > 0 && (
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex -space-x-4 z-20 px-4 py-2 bg-black/30 backdrop-blur-sm rounded-full border border-white/10 min-h-[60px] items-center justify-center">
                       {Object.entries(votes)
@@ -457,7 +462,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                 )}
               />
               <AnimatePresence mode="popLayout">
-                {showResult &&
+                {(showResult || settings?.revealMode === 'instant') &&
                   Object.entries(votes).filter(([_, choice]) => choice === 'B').length > 0 && (
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex -space-x-4 z-20 px-4 py-2 bg-black/30 backdrop-blur-sm rounded-full border border-white/10 min-h-[60px] items-center justify-center">
                       {Object.entries(votes)

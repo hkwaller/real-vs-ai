@@ -119,9 +119,9 @@ const JoinGame: React.FC = () => {
     const resolvedEmoji = selectedEmoji ?? EMOJIS[Math.floor(Math.random() * EMOJIS.length)]
     const playerId = crypto.randomUUID()
 
-    sessionStorage.setItem('rvai_player_id', playerId)
-    sessionStorage.setItem('rvai_player_name', name)
-    sessionStorage.setItem('rvai_player_emoji', resolvedEmoji)
+    localStorage.setItem('rvai_player_id', playerId)
+    localStorage.setItem('rvai_player_name', name)
+    localStorage.setItem('rvai_player_emoji', resolvedEmoji)
 
     navigate(`/play/${upperCode}`)
   }
