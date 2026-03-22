@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useAuth } from '@clerk/react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -12,10 +13,18 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import GameLayout from '@/components/GameLayout'
-import { Loader2, Settings, Clock, Images, Play, Eye, EyeOff } from 'lucide-react'
+import { Loader2, Settings, Clock, Images, Play, Eye, EyeOff, Gift } from 'lucide-react'
+
+const FREE_GAME_LIMIT = 3
+const GAMES_CREATED_KEY = 'rvai_games_created'
 
 const CreateGame: React.FC = () => {
   const navigate = useNavigate()
+  const { isSignedIn } = useAuth()
+
+  const gamesCreated = parseInt(localStorage.getItem(GAMES_CREATED_KEY) ?? '0', 10)
+  const atFreeLimit = !isSignedIn && gamesCreated >= FREE_GAME_LIMIT
+
   const [loading, setLoading] = useState(false)
   const [rounds, setRounds] = useState<number | string>(10)
   const [timeLimit, setTimeLimit] = useState<number | string>(15)
@@ -32,6 +41,9 @@ const CreateGame: React.FC = () => {
 
   const handleCreateGame = () => {
     setLoading(true)
+    if (!isSignedIn) {
+      localStorage.setItem(GAMES_CREATED_KEY, String(gamesCreated + 1))
+    }
     const code = generateGameCode()
     navigate(`/lobby/${code}`, {
       state: {
@@ -40,6 +52,45 @@ const CreateGame: React.FC = () => {
         revealMode,
       },
     })
+  }
+
+  if (atFreeLimit) {
+    return (
+      <GameLayout>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md mx-auto"
+        >
+          <Card className="text-white text-center">
+            <CardHeader>
+              <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-2">
+                <Gift className="w-8 h-8 text-yellow-400" />
+              </div>
+              <CardTitle className="text-2xl">Free Games Used</CardTitle>
+              <CardDescription>
+                You've hosted your {FREE_GAME_LIMIT} free games. Create a free account to keep
+                playing — or go Pro to remove ads.
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="flex flex-col gap-3">
+              <Button variant="neon" size="lg" className="w-full" onClick={() => navigate('/sign-up')}>
+                Create Free Account
+              </Button>
+              <Button variant="outline" size="lg" className="w-full text-black" onClick={() => navigate('/dashboard')}>
+                View Pro Plans
+              </Button>
+              <button
+                onClick={() => navigate('/')}
+                className="text-xs text-muted-foreground underline underline-offset-4"
+              >
+                Back to home
+              </button>
+            </CardFooter>
+          </Card>
+        </motion.div>
+      </GameLayout>
+    )
   }
 
   return (

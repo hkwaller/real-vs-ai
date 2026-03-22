@@ -13,6 +13,7 @@ export type Presence = {
   isHost: boolean;
   hasVoted: boolean;
   currentVote: "A" | "B" | null;
+  timeRemaining: number | null; // seconds left when the player voted
 };
 
 export type Storage = {
@@ -29,10 +30,14 @@ export type Storage = {
   players: LiveList<{ id: string; name: string; emoji: string }>;
 };
 
-type RoomEvent = { type: "ROUND_REVEALED" } | { type: "GAME_OVER" };
+type RoomEvent =
+  | { type: "ROUND_REVEALED" }
+  | { type: "GAME_OVER" }
+  | { type: "PLAYER_KICKED"; playerId: string };
 
 export const {
   RoomProvider,
+  useRoom,
   useMyPresence,
   useUpdateMyPresence,
   useOthers,

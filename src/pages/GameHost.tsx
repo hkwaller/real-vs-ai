@@ -1,15 +1,25 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useAuth, useUser } from '@clerk/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import GameLayout from '@/components/GameLayout'
+import AdBanner from '@/components/AdBanner'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-import { Users, Trophy, Crown } from 'lucide-react'
+import { Users, Trophy, Crown, UserX, X, Edit3Icon } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import {
   RoomProvider,
+  useRoom,
   useOthers,
   useStorage,
   useMutation,
@@ -24,13 +34,25 @@ type RoundData = { id: string; realImageUrl: string; aiImageUrl: string }
 
 // Inner component — all game logic lives here
 const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
+  const navigate = useNavigate()
   const [timeLeft, setTimeLeft] = useState(0)
   const [showResult, setShowResult] = useState(false)
   const [showScoreDialog, setShowScoreDialog] = useState(false)
   const [initialized, setInitialized] = useState(false)
+  const [showPlayersModal, setShowPlayersModal] = useState(false)
+  const [confirmKickId, setConfirmKickId] = useState<string | null>(null)
+
+  // Ad banner: show for signed-in users without an active subscription
+  const { isSignedIn } = useAuth()
+  const { user } = useUser()
+  const isSubscribed =
+    (user?.publicMetadata as { subscriptionStatus?: string } | undefined)?.subscriptionStatus ===
+    'active'
+  const showAds = !!isSignedIn && !isSubscribed
 
   // Connection status — mutations require 'connected'
   const status = useStatus()
+  const room = useRoom()
 
   // Liveblocks storage
   const roundsStorage = useStorage((root) => root.rounds)
@@ -104,6 +126,35 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     storage.get('gameStatus').set('value', 'finished')
   }, [])
 
+  const resetGame = useMutation(({ storage }) => {
+    // Clear all rounds so a fresh set gets generated on next start
+    const roundsList = storage.get('rounds')
+    while (roundsList.length > 0) roundsList.delete(0)
+
+    // Reset every player's score back to 0
+    const scoreMap = storage.get('scores')
+    const playerList = storage.get('players')
+    for (let i = 0; i < playerList.length; i++) {
+      const player = playerList.get(i)
+      if (player) scoreMap.set(player.id, 0)
+    }
+
+    storage.get('currentRoundIndex').set('value', 0)
+    storage.get('gameStatus').set('value', 'waiting')
+  }, [])
+
+  const removePlayer = useMutation(({ storage }, id: string) => {
+    const playerList = storage.get('players')
+    const scoreMap = storage.get('scores')
+    for (let i = 0; i < playerList.length; i++) {
+      if (playerList.get(i)?.id === id) {
+        playerList.delete(i)
+        break
+      }
+    }
+    scoreMap.delete(id)
+  }, [])
+
   // Generate rounds from Supabase Storage and store in Liveblocks
   const generateRoundsAsync = async (count: number) => {
     const { data: files } = await supabase.storage.from('real-vs-ai').list('real')
@@ -137,10 +188,10 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
 
       roundsData = selected.map((file) => ({
         id: crypto.randomUUID(),
-        realImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`real/${file.name}`)
-          .data.publicUrl,
-        aiImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`ai/${file.name}`)
-          .data.publicUrl,
+        realImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`real/${file.name}`).data
+          .publicUrl,
+        aiImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`ai/${file.name}`).data
+          .publicUrl,
       }))
 
       // Update localStorage with used image names
@@ -160,6 +211,10 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
       }))
     }
 
+    // room.getStorage() resolves only when Liveblocks has fully confirmed storage
+    // is ready for mutations — more reliable than checking useStorage() !== null,
+    // which can return non-null before the internal mutation flag is set.
+    await room.getStorage()
     storeRounds(roundsData)
     setTimeLeft(settings?.timeLimit ?? 15)
   }
@@ -233,22 +288,30 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     if (showResult) return
     setShowResult(true)
 
-    if (settings?.revealMode !== 'after_round') {
-      // Delay score dialog so host can see vote emojis + correct/wrong borders briefly
-      setTimeout(() => setShowScoreDialog(true), 2000)
-    }
+    // Always auto-show the score dialog after a short delay so the host can
+    // briefly see the correct/wrong borders before the overlay appears
+    setTimeout(() => setShowScoreDialog(true), 2000)
 
     if (!currentRound) return
 
     const isRealLeft = currentRound.id.charCodeAt(0) % 2 === 0
     const correctChoice = isRealLeft ? 'A' : 'B'
+    const tl = settings?.timeLimit ?? 15
 
-    const updates = Object.entries(votes).map(([playerId, choice]) => ({
-      playerId,
-      increment: choice === correctChoice ? 100 : 0,
-    }))
+    const updates = others
+      .filter((o) => !o.presence.isHost && o.presence.hasVoted)
+      .map((o) => {
+        const choice = o.presence.currentVote
+        const tr = o.presence.timeRemaining ?? 0
+        const correct = choice === correctChoice
+        return {
+          playerId: o.presence.playerId,
+          increment: correct ? Math.max(10, Math.round(100 * (tr / tl))) : 0,
+        }
+      })
 
     updateScores(updates)
+    broadcast({ type: 'ROUND_REVEALED' })
 
     const anyCorrect = updates.some((u) => u.increment > 0)
     if (anyCorrect) {
@@ -258,6 +321,12 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
 
   // Keep ref current so keydown and effects always call the latest version
   revealResultRef.current = revealResult
+
+  const handleKickPlayer = (id: string) => {
+    removePlayer(id)
+    broadcast({ type: 'PLAYER_KICKED', playerId: id })
+    setConfirmKickId(null)
+  }
 
   const nextRound = () => {
     const nextIndex = currentRoundIndex + 1
@@ -288,7 +357,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     return (
       <GameLayout>
         <Card className="text-center p-10 max-w-2xl mx-auto">
-          <Trophy className="w-24 h-24 text-yellow-400 mx-auto mb-6 animate-bounce" />
+          <Trophy className="w-24 h-24 text-yellow-400 mx-auto mb-6" />
           <h1 className="text-5xl font-black mb-2 bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-orange-500">
             Game Over!
           </h1>
@@ -320,19 +389,32 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                     {index + 1}
                   </span>
                   <span className="text-3xl">{player.emoji}</span>
-                  <span className="font-bold text-xl">{player.name}</span>
+                  <span className="font-bold text-xl text-white">{player.name}</span>
                   {index === 0 && <Crown className="w-6 h-6 text-yellow-400" />}
                 </div>
-                <span className="font-mono font-bold text-2xl">{player.score}</span>
+                <span className="font-mono font-bold text-2xl text-white">{player.score}</span>
               </motion.div>
             ))}
           </div>
 
           <div className="flex gap-4 justify-center">
-            <Button onClick={() => (window.location.href = '/')} variant="outline" size="lg">
+            <Button onClick={() => navigate('/')} variant="outline" size="lg">
               Back to Home
             </Button>
-            <Button onClick={() => (window.location.href = '/create')} variant="neon" size="lg">
+            <Button
+              onClick={() => {
+                resetGame()
+                navigate(`/lobby/${code}`, {
+                  state: {
+                    rounds: settings?.rounds ?? 10,
+                    timeLimit: settings?.timeLimit ?? 15,
+                    revealMode: settings?.revealMode ?? 'instant',
+                  },
+                })
+              }}
+              variant="neon"
+              size="lg"
+            >
               Play Again
             </Button>
           </div>
@@ -379,16 +461,75 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                 Finish Round
               </Button>
             )}
-            {settings?.revealMode === 'after_round' && showResult && !showScoreDialog && (
-              <Button variant="neon" size="sm" onClick={() => setShowScoreDialog(true)}>
-                Show Scores
-              </Button>
-            )}
-            <div className="flex items-center gap-2">
-              <Users className="w-6 h-6" />
-              <span className="text-xl">
-                {Object.keys(votes).length} / {storedPlayers?.length ?? 0} Votes
-              </span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Users className="w-6 h-6" />
+                <span className="text-xl">
+                  {Object.keys(votes).length} / {storedPlayers?.length ?? 0} Votes
+                </span>
+              </div>
+              <Dialog open={showPlayersModal} onOpenChange={setShowPlayersModal}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2 text-black">
+                    <Edit3Icon className="w-4 h-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle>Players</DialogTitle>
+                  </DialogHeader>
+                  <div className="flex flex-col gap-2 mt-2">
+                    {players.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No players yet
+                      </p>
+                    )}
+                    {players.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between rounded-lg border px-3 py-2 bg-slate-900/50"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{p.emoji}</span>
+                          <div>
+                            <p className="font-medium text-sm">{p.name}</p>
+                            <p className="text-xs text-muted-foreground">{p.score} pts</p>
+                          </div>
+                        </div>
+                        {confirmKickId === p.id ? (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => handleKickPlayer(p.id)}
+                            >
+                              Confirm
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2"
+                              onClick={() => setConfirmKickId(null)}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+                            onClick={() => setConfirmKickId(p.id)}
+                          >
+                            <UserX className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
@@ -433,8 +574,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                                 type: 'spring',
                                 stiffness: 300,
                                 damping: 20,
-                                delay:
-                                  settings?.revealMode === 'after_round' ? index * 0.05 : 0,
+                                delay: settings?.revealMode === 'after_round' ? index * 0.05 : 0,
                               }}
                               className="text-4xl drop-shadow-lg relative hover:z-30 hover:scale-125 transition-transform cursor-default"
                               title={player.name}
@@ -480,8 +620,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                                 type: 'spring',
                                 stiffness: 300,
                                 damping: 20,
-                                delay:
-                                  settings?.revealMode === 'after_round' ? index * 0.05 : 0,
+                                delay: settings?.revealMode === 'after_round' ? index * 0.05 : 0,
                               }}
                               className="text-4xl drop-shadow-lg relative hover:z-30 hover:scale-125 transition-transform cursor-default"
                               title={player.name}
@@ -550,6 +689,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
           </AnimatePresence>
         </div>
       </div>
+      {showAds && <AdBanner />}
     </GameLayout>
   )
 }
@@ -570,6 +710,7 @@ const GameHost: React.FC = () => {
         isHost: true,
         hasVoted: false,
         currentVote: null,
+        timeRemaining: null,
       }}
       initialStorage={{
         gameStatus: new LiveObject({ value: 'waiting' }),

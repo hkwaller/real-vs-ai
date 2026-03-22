@@ -11,6 +11,7 @@ import {
   useOthers,
   useMutation,
   useStatus,
+  useStorage,
   LiveList,
   LiveMap,
   LiveObject,
@@ -37,9 +38,11 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
       emoji: o.presence.emoji,
     }));
 
-  // Gate mutations on WebSocket being fully connected
+  // Gate mutations on WebSocket being fully connected AND storage hydrated from server.
+  // status === 'connected' fires when the socket opens, but storage arrives slightly later.
   const status = useStatus();
-  const isReady = status === 'connected';
+  const storageLoaded = useStorage((root) => root.gameStatus) !== null;
+  const isReady = status === 'connected' && storageLoaded;
 
   // Actively write settings to storage once connected — don't rely on initialStorage,
   // which is ignored if a stale room already exists on the Liveblocks server.
@@ -192,6 +195,7 @@ const Lobby: React.FC = () => {
         isHost: true,
         hasVoted: false,
         currentVote: null,
+        timeRemaining: null,
       }}
       initialStorage={{
         gameStatus: new LiveObject({ value: 'waiting' }),

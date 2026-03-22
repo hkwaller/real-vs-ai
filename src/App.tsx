@@ -8,11 +8,14 @@ import JoinGame from './pages/JoinGame'
 import GameHost from './pages/GameHost'
 import PlayerGame from './pages/PlayerGame'
 import CreateGame from './pages/CreateGame'
+import Dashboard from './pages/Dashboard'
+import SignInPage from './pages/SignInPage'
+import SignUpPage from './pages/SignUpPage'
 
 function ProtectedRoute({ element }: { element: React.ReactElement }) {
   const { isSignedIn, isLoaded } = useAuth()
   if (!isLoaded) return null
-  if (!isSignedIn) return <RedirectToSignIn />
+  if (!isSignedIn) return <RedirectToSignIn redirectUrl="/sign-in" />
   return element
 }
 
@@ -21,9 +24,12 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/sign-in/*" element={<SignInPage />} />
+        <Route path="/sign-up/*" element={<SignUpPage />} />
+        <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} />} />
         <Route path="/admin" element={<ProtectedRoute element={<AdminView />} />} />
         <Route path="/generate" element={<ProtectedRoute element={<GenerateImage />} />} />
-        <Route path="/create" element={<ProtectedRoute element={<CreateGame />} />} />
+        <Route path="/create" element={<CreateGame />} />
         <Route path="/join" element={<JoinGame />} />
         <Route path="/lobby/:code" element={<Lobby />} />
         <Route path="/game/:code" element={<GameHost />} />

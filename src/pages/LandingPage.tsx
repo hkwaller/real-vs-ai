@@ -1,13 +1,15 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, Variants } from 'framer-motion'
+import { useAuth, UserButton } from '@clerk/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import GameLayout from '@/components/GameLayout'
-import { User, Zap } from 'lucide-react'
+import { User, Zap, LayoutDashboard } from 'lucide-react'
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate()
+  const { isSignedIn, isLoaded } = useAuth()
 
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
@@ -33,6 +35,35 @@ const LandingPage: React.FC = () => {
 
   return (
     <GameLayout>
+      {/* Top-right auth nav */}
+      {isLoaded && (
+        <div className="absolute top-4 right-4 z-20 flex items-center gap-3">
+          {isSignedIn ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/dashboard')}
+                className="flex items-center gap-2 text-sm"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboard
+              </Button>
+              <UserButton />
+            </>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/sign-in')}
+              className="text-sm"
+            >
+              Sign In
+            </Button>
+          )}
+        </div>
+      )}
+
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -61,7 +92,10 @@ const LandingPage: React.FC = () => {
                 <Zap className="w-6 h-6 text-yellow-400 group-hover:animate-pulse" />
                 Host Game
               </CardTitle>
-              <CardDescription>Create a room and invite players</CardDescription>
+              <CardDescription>
+                Create a room and invite players
+                <span className="block mt-1 text-green-400/80">First 3 games free — no account needed</span>
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Button variant="neon" size="xl" className="w-full">
