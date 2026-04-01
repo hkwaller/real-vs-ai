@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useUser } from '@clerk/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,7 @@ interface GameSettings {
 }
 
 // Inner component that uses Liveblocks hooks
-const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code, settings }) => {
+const LobbyContent: React.FC<{ code: string; settings: GameSettings; isSubscribed: boolean }> = ({ code, settings, isSubscribed }) => {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
 
@@ -56,9 +57,17 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
     [],
   );
 
+  const writeHostIsPro = useMutation(
+    ({ storage }, pro: boolean) => {
+      storage.get('hostIsPro').set('value', pro);
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!isReady) return;
     writeSettings(settings);
+    writeHostIsPro(isSubscribed);
   }, [isReady]);
 
   const startGame = useMutation(({ storage }) => {
@@ -177,11 +186,16 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
 const Lobby: React.FC = () => {
   const { code } = useParams<{ code: string }>();
   const location = useLocation();
+  const { user } = useUser();
   const settings = (location.state as GameSettings | null) ?? {
     rounds: 10,
     timeLimit: 15,
     revealMode: 'instant' as const,
   };
+
+  const isSubscribed =
+    (user?.publicMetadata as { subscriptionStatus?: string } | undefined)?.subscriptionStatus ===
+    'active';
 
   if (!code) return null;
 
@@ -209,9 +223,10 @@ const Lobby: React.FC = () => {
         votes: new LiveMap(),
         scores: new LiveMap(),
         players: new LiveList([]),
+        hostIsPro: new LiveObject({ value: false }),
       }}
     >
-      <LobbyContent code={code} settings={settings} />
+      <LobbyContent code={code} settings={settings} isSubscribed={isSubscribed} />
     </RoomProvider>
   );
 };
