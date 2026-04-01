@@ -28,6 +28,7 @@ export type Storage = {
   votes: LiveMap<string, "A" | "B">;
   scores: LiveMap<string, number>;
   players: LiveList<{ id: string; name: string; emoji: string }>;
+  hostIsPro: LiveObject<{ value: boolean }>;
 };
 
 type RoomEvent =

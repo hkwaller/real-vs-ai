@@ -4,7 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import GameLayout from '@/components/GameLayout'
+import AdBanner from '@/components/AdBanner'
 import { Loader2, Trophy } from 'lucide-react'
+
+const POPUNDER_KEY = import.meta.env.VITE_ADSTERRA_POPUNDER_KEY as string | undefined
 import {
   RoomProvider,
   useStorage,
@@ -37,6 +40,7 @@ const PlayerGameContent: React.FC<{
   const [timeRemaining, setTimeRemaining] = useState<number>(15)
   const voteChoiceRef = useRef<'A' | 'B' | null>(null)
   const timeRemainingRef = useRef<number>(15)
+  const popunderFired = useRef(false)
 
   const updatePresence = useUpdateMyPresence()
 
@@ -45,6 +49,7 @@ const PlayerGameContent: React.FC<{
   const currentRoundIndexObj = useStorage((root) => root.currentRoundIndex)
   const rounds = useStorage((root) => root.rounds)
   const settingsObj = useStorage((root) => root.settings)
+  const hostIsPro = useStorage((root) => root.hostIsPro?.value ?? true)
 
   const currentRoundIndex = currentRoundIndexObj?.value ?? 0
   const currentRound = rounds?.[currentRoundIndex] ?? null
@@ -132,6 +137,16 @@ const PlayerGameContent: React.FC<{
     setRoundResult({ didVote: true, correct, correctChoice, points })
   })
 
+  // Fire Adsterra popunder once when game finishes and host is not pro
+  useEffect(() => {
+    if (gameStatus !== 'finished' || hostIsPro || popunderFired.current || !POPUNDER_KEY) return
+    popunderFired.current = true
+    const script = document.createElement('script')
+    script.type = 'text/javascript'
+    script.src = `//www.topcreativeformat.com/${POPUNDER_KEY}/invoke.js`
+    document.body.appendChild(script)
+  }, [gameStatus, hostIsPro])
+
   // Game over
   if (gameStatus === 'finished') {
     return (
@@ -144,6 +159,7 @@ const PlayerGameContent: React.FC<{
             Exit
           </Button>
         </Card>
+        {!hostIsPro && <AdBanner />}
       </GameLayout>
     )
   }
@@ -298,6 +314,7 @@ const PlayerGameContent: React.FC<{
           )}
         </AnimatePresence>
       </div>
+      {!hostIsPro && <AdBanner />}
     </GameLayout>
   )
 }
