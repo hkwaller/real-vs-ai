@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import GameLayout from '@/components/GameLayout'
 import { Loader2, Calendar, Trophy, Home, ArrowRight } from 'lucide-react'
 import {
@@ -60,10 +59,15 @@ const DailyChallengeArchive: React.FC = () => {
   if (loading) {
     return (
       <GameLayout>
-        <Card className="text-center p-10 border-0">
-          <Loader2 className="w-12 h-12 text-amber-400 mx-auto mb-4 animate-spin" />
-          <h1 className="text-2xl font-bold">Loading archive...</h1>
-        </Card>
+        <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-10 max-w-sm mx-auto text-center space-y-4">
+          <Loader2 className="w-10 h-10 text-[#FFB830] mx-auto animate-spin" />
+          <div>
+            <p className="mission-label mb-1">Accessing Archives</p>
+            <h1 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase">
+              Loading Archive
+            </h1>
+          </div>
+        </div>
       </GameLayout>
     )
   }
@@ -73,18 +77,22 @@ const DailyChallengeArchive: React.FC = () => {
   return (
     <GameLayout>
       <div className="flex flex-col items-center gap-6 w-full max-w-md">
+        {/* Header */}
         <div className="text-center w-full">
-          <div className="flex items-center justify-center gap-2 text-amber-400 mb-1">
-            <Calendar className="w-5 h-5" />
-            <span className="font-semibold">Daily Challenge Archive</span>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Calendar className="w-5 h-5 text-[#FFB830]" />
+            <p className="mission-label">Archive</p>
           </div>
-          <p className="text-muted-foreground text-sm">Browse and replay past challenges</p>
+          <h1 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase tracking-wide">
+            Past Missions
+          </h1>
+          <p className="text-[#8B97C8] text-sm mt-1">Browse and replay past challenges</p>
         </div>
 
         {entries.length === 0 ? (
-          <Card className="w-full text-center p-8">
-            <p className="text-muted-foreground">No challenges available yet.</p>
-          </Card>
+          <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-8 w-full text-center">
+            <p className="text-[#8B97C8] font-space-mono text-sm">// No challenges available yet.</p>
+          </div>
         ) : (
           <motion.div
             className="w-full flex flex-col gap-2"
@@ -108,45 +116,51 @@ const DailyChallengeArchive: React.FC = () => {
                     visible: { opacity: 1, y: 0 },
                   }}
                 >
-                  <Card
-                    className={`w-full cursor-pointer hover:border-amber-500/50 transition-colors ${isToday ? 'border-amber-500/30' : ''}`}
+                  <div
+                    className={`bg-[#111840] border cursor-pointer hover:border-[#FF6B1A]/50 transition-colors px-4 py-3 flex items-center justify-between ${
+                      isToday ? 'border-[#FFB830]/50' : 'border-[#2A3468]'
+                    }`}
                     onClick={() => navigate(isToday ? '/daily' : `/daily/${entry.date}`)}
                   >
-                    <CardContent className="flex items-center justify-between py-3 px-4">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
-                            completed
-                              ? 'bg-amber-500/20 text-amber-400'
-                              : 'bg-white/10 text-muted-foreground'
-                          }`}
-                        >
-                          {completed ? <Trophy className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">
-                            {isToday ? "Today's Challenge" : new Date(entry.date + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </p>
-                          {completed && pct !== null ? (
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <div className="w-20 bg-white/10 rounded-full h-1">
-                                <div
-                                  className="bg-gradient-to-r from-amber-400 to-orange-400 h-1 rounded-full"
-                                  style={{ width: `${pct}%` }}
-                                />
-                              </div>
-                              <span className="text-xs text-amber-400 font-medium">
-                                {entry.score}/{entry.maxScore}
-                              </span>
-                            </div>
-                          ) : (
-                            <p className="text-xs text-muted-foreground">Not completed</p>
-                          )}
-                        </div>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-8 h-8 flex items-center justify-center text-sm ${
+                          completed
+                            ? 'bg-[#FFB830]/20 text-[#FFB830]'
+                            : 'bg-[#1A2355] text-[#8B97C8]'
+                        }`}
+                      >
+                        {completed ? <Trophy className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
                       </div>
-                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                    </CardContent>
-                  </Card>
+                      <div>
+                        <p className="font-orbitron text-sm font-bold text-[#F5F0E8] uppercase tracking-wide">
+                          {isToday
+                            ? "Today's Challenge"
+                            : new Date(entry.date + 'T12:00:00').toLocaleDateString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}
+                        </p>
+                        {completed && pct !== null ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="w-20 bg-[#0B0F2E] h-1 border border-[#2A3468]">
+                              <div
+                                className="bg-[#FFB830] h-full"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="font-space-mono text-xs text-[#FFB830] font-bold">
+                              {entry.score}/{entry.maxScore}
+                            </span>
+                          </div>
+                        ) : (
+                          <p className="font-space-mono text-xs text-[#8B97C8]">Not completed</p>
+                        )}
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-[#8B97C8]" />
+                  </div>
                 </motion.div>
               )
             })}

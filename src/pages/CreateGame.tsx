@@ -3,17 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '@clerk/react'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardFooter,
-} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import GameLayout from '@/components/GameLayout'
-import { Loader2, Settings, Clock, Images, Play, Eye, EyeOff, Gift } from 'lucide-react'
+import { Loader2, Clock, Images, Play, Eye, EyeOff, Gift, Rocket } from 'lucide-react'
 
 const FREE_GAME_LIMIT = 3
 const GAMES_CREATED_KEY = 'rvai_games_created'
@@ -62,32 +54,35 @@ const CreateGame: React.FC = () => {
           animate={{ opacity: 1, scale: 1 }}
           className="w-full max-w-md mx-auto"
         >
-          <Card className="text-white text-center">
-            <CardHeader>
-              <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-2">
-                <Gift className="w-8 h-8 text-yellow-400" />
-              </div>
-              <CardTitle className="text-2xl">Free Games Used</CardTitle>
-              <CardDescription>
-                You've hosted your {FREE_GAME_LIMIT} free games. Create a free account to keep
-                playing — or go Pro to remove ads.
-              </CardDescription>
-            </CardHeader>
-            <CardFooter className="flex flex-col gap-3">
-              <Button variant="neon" size="lg" className="w-full" onClick={() => navigate('/sign-up')}>
+          <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-8 text-center space-y-6">
+            <div className="w-16 h-16 border-2 border-[#FFB830] flex items-center justify-center mx-auto">
+              <Gift className="w-8 h-8 text-[#FFB830]" />
+            </div>
+            <div>
+              <p className="mission-label mb-2">Access Denied</p>
+              <h2 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase">
+                Free Missions Used
+              </h2>
+              <p className="text-[#8B97C8] text-sm mt-3">
+                You've completed your {FREE_GAME_LIMIT} free missions. Create a free account to
+                continue — or go Pro to remove ads.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <Button size="lg" className="w-full" onClick={() => navigate('/sign-up')}>
                 Create Free Account
               </Button>
-              <Button variant="outline" size="lg" className="w-full text-black" onClick={() => navigate('/dashboard')}>
+              <Button variant="outline" size="lg" className="w-full" onClick={() => navigate('/dashboard')}>
                 View Pro Plans
               </Button>
               <button
                 onClick={() => navigate('/')}
-                className="text-xs text-muted-foreground underline underline-offset-4"
+                className="font-space-mono text-xs text-[#8B97C8] hover:text-[#F5F0E8] transition-colors"
               >
-                Back to home
+                ← Return to base
               </button>
-            </CardFooter>
-          </Card>
+            </div>
+          </div>
         </motion.div>
       </GameLayout>
     )
@@ -100,19 +95,21 @@ const CreateGame: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md mx-auto"
       >
-        <Card className="text-white">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="w-6 h-6 text-indigo-400" />
-              Game Settings
-            </CardTitle>
-            <CardDescription>Configure your match</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-8 space-y-8">
+          <div>
+            <p className="mission-label mb-2">Setup</p>
+            <h1 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase tracking-wide">
+              Mission Config
+            </h1>
+            <p className="text-[#8B97C8] text-sm mt-1">Configure your game parameters</p>
+          </div>
+
+          <div className="space-y-6">
+            {/* Rounds */}
             <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Images className="w-4 h-4 text-muted-foreground" />
-                Number of Rounds
+              <label className="mission-label flex items-center gap-2">
+                <Images className="w-3 h-3" />
+                Rounds
               </label>
               <Input
                 type="number"
@@ -120,14 +117,15 @@ const CreateGame: React.FC = () => {
                 max="20"
                 value={rounds}
                 onChange={(e) => setRounds(e.target.value)}
-                className="bg-slate-900/50"
+                className="bg-[#0B0F2E] border-[#2A3468] text-[#F5F0E8] font-space-mono text-lg focus:border-[#FF6B1A] focus:ring-[#FF6B1A]/20 h-12"
               />
             </div>
 
+            {/* Time limit */}
             <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Clock className="w-4 h-4 text-muted-foreground" />
-                Time Limit (seconds)
+              <label className="mission-label flex items-center gap-2">
+                <Clock className="w-3 h-3" />
+                Time Per Round (seconds)
               </label>
               <Input
                 type="number"
@@ -135,66 +133,65 @@ const CreateGame: React.FC = () => {
                 max="60"
                 value={timeLimit}
                 onChange={(e) => setTimeLimit(e.target.value)}
-                className="bg-slate-900/50"
+                className="bg-[#0B0F2E] border-[#2A3468] text-[#F5F0E8] font-space-mono text-lg focus:border-[#FF6B1A] focus:ring-[#FF6B1A]/20 h-12"
               />
             </div>
 
+            {/* Reveal mode */}
             <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                {revealMode === 'instant' ? (
-                  <Eye className="w-4 h-4 text-muted-foreground" />
-                ) : (
-                  <EyeOff className="w-4 h-4 text-muted-foreground" />
-                )}
-                Reveal Answers
+              <label className="mission-label flex items-center gap-2">
+                {revealMode === 'instant' ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                Reveal Mode
               </label>
               <div className="grid grid-cols-2 gap-2">
-                <Button
+                <button
                   type="button"
-                  variant={revealMode === 'instant' ? 'neon' : 'outline'}
                   onClick={() => setRevealMode('instant')}
-                  className={`w-full ${revealMode === 'instant' ? 'text-white' : 'text-black'}`}
+                  className={`py-3 px-4 text-xs font-orbitron font-bold uppercase tracking-widest transition-all border ${
+                    revealMode === 'instant'
+                      ? 'bg-[#FF6B1A] text-[#0B0F2E] border-[#FF6B1A] shadow-[0_0_15px_rgba(255,107,26,0.3)]'
+                      : 'bg-transparent text-[#8B97C8] border-[#2A3468] hover:border-[#FF6B1A] hover:text-[#FF6B1A]'
+                  }`}
                 >
                   Instantly
-                </Button>
-                <Button
+                </button>
+                <button
                   type="button"
-                  variant={revealMode === 'after_round' ? 'neon' : 'outline'}
                   onClick={() => setRevealMode('after_round')}
-                  className={`w-full ${revealMode === 'after_round' ? 'text-white' : 'text-black'}`}
+                  className={`py-3 px-4 text-xs font-orbitron font-bold uppercase tracking-widest transition-all border ${
+                    revealMode === 'after_round'
+                      ? 'bg-[#FF6B1A] text-[#0B0F2E] border-[#FF6B1A] shadow-[0_0_15px_rgba(255,107,26,0.3)]'
+                      : 'bg-transparent text-[#8B97C8] border-[#2A3468] hover:border-[#FF6B1A] hover:text-[#FF6B1A]'
+                  }`}
                 >
                   After Round
-                </Button>
+                </button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {revealMode === 'instant'
-                  ? 'Votes are shown as they happen.'
-                  : 'Votes are hidden until the round ends.'}
+              <p className="font-space-mono text-xs text-[#8B97C8]">
+                // {revealMode === 'instant' ? 'Votes are shown as they happen.' : 'Votes are hidden until round ends.'}
               </p>
             </div>
-          </CardContent>
-          <CardFooter>
-            <Button
-              variant="neon"
-              size="lg"
-              className="w-full"
-              onClick={handleCreateGame}
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  Create Lobby
-                </>
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
+          </div>
+
+          <Button
+            size="lg"
+            className="w-full"
+            onClick={handleCreateGame}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Initializing...
+              </>
+            ) : (
+              <>
+                <Rocket className="mr-2 h-4 w-4" />
+                Initialize Mission
+              </>
+            )}
+          </Button>
+        </div>
       </motion.div>
     </GameLayout>
   )

@@ -41,9 +41,7 @@ const GenerateImage: React.FC = () => {
     try {
       const response = await fetch(import.meta.env.VITE_N8N_API_URL as string, {
         method: 'POST',
-        headers: {
-          'real-vs-ai-key': import.meta.env.VITE_API_KEY,
-        },
+        headers: { 'real-vs-ai-key': import.meta.env.VITE_API_KEY },
         body: formData,
       })
 

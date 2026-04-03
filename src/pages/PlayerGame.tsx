@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import GameLayout from '@/components/GameLayout'
 import { Loader2, Trophy } from 'lucide-react'
 import {
@@ -16,7 +15,6 @@ import {
   LiveObject,
 } from '@/liveblocks.config'
 
-// Inner component — uses Liveblocks hooks
 type RoundResult = {
   didVote: boolean
   correct: boolean
@@ -40,7 +38,6 @@ const PlayerGameContent: React.FC<{
 
   const updatePresence = useUpdateMyPresence()
 
-  // Liveblocks storage — null while loading, value once hydrated
   const gameStatus = useStorage((root) => root.gameStatus?.value ?? null)
   const currentRoundIndexObj = useStorage((root) => root.currentRoundIndex)
   const rounds = useStorage((root) => root.rounds)
@@ -50,13 +47,12 @@ const PlayerGameContent: React.FC<{
   const currentRound = rounds?.[currentRoundIndex] ?? null
   const timeLimit = settingsObj?.timeLimit ?? 15
 
-  // Register player in Storage once storage has loaded (deduplicates by playerId)
   const registerPlayer = useMutation(
     ({ storage }) => {
       const playerList = storage.get('players')
       const scoreMap = storage.get('scores')
       for (let i = 0; i < playerList.length; i++) {
-        if (playerList.get(i)?.id === playerId) return // already registered
+        if (playerList.get(i)?.id === playerId) return
       }
       playerList.push({ id: playerId, name: playerName, emoji: playerEmoji })
       scoreMap.set(playerId, 0)
@@ -64,7 +60,6 @@ const PlayerGameContent: React.FC<{
     [playerId, playerName, playerEmoji],
   )
 
-  // Wait for storage to hydrate (gameStatus !== null) before registering
   useEffect(() => {
     if (registered || gameStatus === null) return
     setRegistered(true)
@@ -98,7 +93,6 @@ const PlayerGameContent: React.FC<{
     updatePresence({ hasVoted: true, currentVote: choice, timeRemaining: remaining })
   }
 
-  // If the host removes this player, send them back to the join screen
   useEventListener(({ event }) => {
     if (event.type !== 'PLAYER_KICKED') return
     if (event.playerId !== playerId) return
@@ -106,7 +100,6 @@ const PlayerGameContent: React.FC<{
     navigate('/join')
   })
 
-  // When the host reveals results, show correct/wrong feedback
   useEventListener(({ event }) => {
     if (event.type !== 'ROUND_REVEALED') return
     if (!currentRound) return
@@ -128,135 +121,148 @@ const PlayerGameContent: React.FC<{
   if (gameStatus === 'finished') {
     return (
       <GameLayout>
-        <Card className="text-center p-10">
-          <Trophy className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold mb-2 text-white">Game Over!</h1>
-          <p className="text-muted-foreground">Check the main screen for results.</p>
-          <Button className="mt-6" onClick={() => navigate('/')} variant="outline">
-            Exit
+        <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-10 max-w-sm mx-auto text-center space-y-6">
+          <Trophy className="w-14 h-14 text-[#FFB830] mx-auto" />
+          <div>
+            <p className="mission-label mb-2">Debrief</p>
+            <h1 className="font-orbitron text-3xl font-black text-[#FF6B1A] uppercase">
+              Mission Complete
+            </h1>
+            <p className="text-[#8B97C8] mt-2 text-sm">Check the main screen for results.</p>
+          </div>
+          <Button onClick={() => navigate('/')} variant="outline">
+            Return to Base
           </Button>
-        </Card>
+        </div>
       </GameLayout>
     )
   }
 
-  // Waiting (game not started or between rounds)
+  // Waiting
   if (gameStatus !== 'playing' || !currentRound) {
     return (
       <GameLayout>
-        <Card className="text-center p-10 border-0">
-          <Loader2 className="w-12 h-12 text-indigo-400 mx-auto mb-4 animate-spin" />
-          <h1 className="text-2xl font-bold">Waiting for Host...</h1>
-          <p className="text-muted-foreground mt-2">Get ready!</p>
+        <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-10 max-w-sm mx-auto text-center space-y-6">
+          <Loader2 className="w-10 h-10 text-[#FF6B1A] mx-auto animate-spin" />
+          <div>
+            <p className="mission-label mb-2">Standby</p>
+            <h1 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase">
+              Awaiting Host
+            </h1>
+            <p className="font-space-mono text-xs text-[#8B97C8] mt-3">// Get ready, operative</p>
+          </div>
           <button
             onClick={() => navigate('/join')}
-            className="mt-6 text-xs text-muted-foreground underline underline-offset-4"
+            className="font-space-mono text-xs text-[#8B97C8] hover:text-[#F5F0E8] transition-colors"
           >
-            Wrong game code? Go back
+            ← Wrong code? Go back
           </button>
-        </Card>
+        </div>
       </GameLayout>
     )
   }
 
   return (
     <GameLayout>
-      <div className="flex flex-col items-center space-y-8 w-full max-w-md mx-auto">
-        <div className="text-center">
-          <span className="text-2xl text-muted-foreground">
-            {playerName} ({playerEmoji})
-          </span>
-          <h2 className="text-xl font-medium text-indigo-300">Round {currentRoundIndex + 1}</h2>
-          <h1 className="text-3xl font-bold mt-2">Which is REAL?</h1>
+      <div className="flex flex-col items-center gap-8 w-full max-w-sm mx-auto">
+        {/* Player + round info */}
+        <div className="text-center space-y-1">
+          <p className="text-2xl">{playerEmoji}</p>
+          <p className="font-orbitron text-sm font-bold text-[#F5F0E8] uppercase tracking-widest">
+            {playerName}
+          </p>
+          <p className="mission-label">Round {currentRoundIndex + 1}</p>
         </div>
 
         <AnimatePresence mode="wait">
           {roundResult ? (
-            // Result reveal screen
+            // Result
             <motion.div
               key="result"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
+              exit={{ opacity: 0 }}
               className="w-full"
             >
-              <Card
-                className={`w-full text-center py-10 border-2 ${
+              <div
+                className={`corner-bracket border-2 p-10 text-center space-y-5 ${
                   !roundResult.didVote
-                    ? 'border-yellow-500/50 bg-yellow-500/10'
+                    ? 'bg-[#FFB830]/10 border-[#FFB830]'
                     : roundResult.correct
-                      ? 'border-green-500/50 bg-green-500/10'
-                      : 'border-red-500/50 bg-red-500/10'
+                      ? 'bg-[#00FFE5]/10 border-[#00FFE5]'
+                      : 'bg-[#FF3D1A]/10 border-[#FF3D1A]'
                 }`}
               >
-                <div className="flex flex-col items-center gap-4">
-                  <div className="text-7xl">
-                    {!roundResult.didVote ? '⏰' : roundResult.correct ? '✅' : '❌'}
-                  </div>
-                  <div>
-                    <h2
-                      className={`text-3xl font-black ${
-                        !roundResult.didVote
-                          ? 'text-yellow-400'
-                          : roundResult.correct
-                            ? 'text-green-400'
-                            : 'text-red-400'
-                      }`}
-                    >
-                      {!roundResult.didVote
-                        ? "Too slow!"
+                <div className="text-6xl">
+                  {!roundResult.didVote ? '⏰' : roundResult.correct ? '✅' : '❌'}
+                </div>
+                <div>
+                  <h2
+                    className={`font-orbitron text-3xl font-black uppercase ${
+                      !roundResult.didVote
+                        ? 'text-[#FFB830]'
                         : roundResult.correct
-                          ? 'Correct!'
-                          : 'Wrong!'}
-                    </h2>
-                    <p className="text-muted-foreground mt-1">
-                      Option{' '}
-                      <span className="font-bold text-white">{roundResult.correctChoice}</span> was
-                      the real photo
-                    </p>
-                  </div>
-                  {roundResult.correct && (
-                    <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-full px-6 py-2">
-                      <span className="text-yellow-400 font-black text-2xl">
-                        +{roundResult.points} pts
-                      </span>
-                    </div>
-                  )}
-                  <p className="text-sm text-muted-foreground animate-pulse">
-                    Waiting for next round...
+                          ? 'text-[#00FFE5]'
+                          : 'text-[#FF3D1A]'
+                    }`}
+                  >
+                    {!roundResult.didVote ? 'Too Slow' : roundResult.correct ? 'Correct' : 'Wrong'}
+                  </h2>
+                  <p className="text-[#8B97C8] mt-2 text-sm">
+                    Option{' '}
+                    <span className="font-bold text-[#F5F0E8]">{roundResult.correctChoice}</span> was
+                    the real photo
                   </p>
                 </div>
-              </Card>
+                {roundResult.correct && (
+                  <div className="border border-[#FFB830]/50 bg-[#FFB830]/10 px-6 py-2 inline-block">
+                    <span className="font-space-mono font-bold text-2xl text-[#FFB830]">
+                      +{roundResult.points} PTS
+                    </span>
+                  </div>
+                )}
+                <p className="font-space-mono text-xs text-[#8B97C8] animate-pulse">
+                  // Awaiting next round...
+                </p>
+              </div>
             </motion.div>
           ) : !hasVoted ? (
-            // Voting buttons
+            // Vote buttons
             <motion.div
               key="vote"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="grid grid-cols-1 gap-4 w-full"
+              className="w-full space-y-4"
             >
-              <div className="flex justify-center">
+              <div className="text-center">
+                <p className="mission-label mb-1">Time Remaining</p>
                 <span
-                  className={`text-sm font-mono tabular-nums ${timeRemaining <= 5 ? 'text-red-400 animate-pulse' : 'text-muted-foreground'}`}
+                  className={`font-space-mono text-5xl font-bold ${
+                    timeRemaining <= 5 ? 'text-[#FF3D1A] animate-pulse' : 'text-[#FF6B1A]'
+                  }`}
                 >
-                  {timeRemaining}s
+                  {timeRemaining}
                 </span>
               </div>
+
+              <p className="font-orbitron text-lg font-bold text-[#F5F0E8] text-center uppercase tracking-widest">
+                Which is Real?
+              </p>
+
               <motion.button
                 whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => handleVote('A')}
-                className="h-32 bg-gradient-to-br from-indigo-600 to-blue-600 rounded-2xl text-4xl font-black shadow-lg border-2 border-white/10 hover:border-white/30 transition-all"
+                className="w-full h-28 bg-[#FF6B1A] text-[#0B0F2E] font-orbitron text-5xl font-black hover:bg-[#FF8C42] hover:shadow-[0_0_30px_rgba(255,107,26,0.5)] transition-all"
               >
                 A
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => handleVote('B')}
-                className="h-32 bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl text-4xl font-black shadow-lg border-2 border-white/10 hover:border-white/30 transition-all"
+                className="w-full h-28 bg-[#1A2355] border-2 border-[#FF6B1A] text-[#FF6B1A] font-orbitron text-5xl font-black hover:bg-[#FF6B1A]/20 hover:shadow-[0_0_30px_rgba(255,107,26,0.3)] transition-all"
               >
                 B
               </motion.button>
@@ -270,22 +276,20 @@ const PlayerGameContent: React.FC<{
               exit={{ opacity: 0 }}
               className="w-full"
             >
-              <Card className="w-full text-center py-10">
-                <div className="flex flex-col items-center gap-4">
-                  <div
-                    className={`text-6xl font-black ${voteChoice === 'A' ? 'text-indigo-400' : 'text-pink-400'}`}
-                  >
-                    {voteChoice}
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold">Vote Cast!</h2>
-                    <p className="text-muted-foreground">You chose Option {voteChoice}</p>
-                  </div>
-                  <p className="text-sm text-indigo-300 animate-pulse mt-4">
-                    Waiting for results...
-                  </p>
+              <div className="corner-bracket bg-[#111840] border border-[#FF6B1A] p-10 text-center space-y-5">
+                <div className="font-orbitron text-7xl font-black text-[#FF6B1A] text-glow-orange">
+                  {voteChoice}
                 </div>
-              </Card>
+                <div>
+                  <h2 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase">
+                    Vote Locked
+                  </h2>
+                  <p className="text-[#8B97C8] text-sm mt-1">You chose Option {voteChoice}</p>
+                </div>
+                <p className="font-space-mono text-xs text-[#00FFE5] animate-pulse">
+                  // Awaiting results...
+                </p>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -294,14 +298,11 @@ const PlayerGameContent: React.FC<{
   )
 }
 
-// Outer component — mounts RoomProvider
 const PlayerGame: React.FC = () => {
   const { code } = useParams<{ code: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
 
-  // Player identity lives in localStorage keyed by the pid in the URL,
-  // so multiple tabs in the same browser each get their own independent identity.
   const playerId = searchParams.get('pid')
   const playerData = playerId
     ? (() => {
