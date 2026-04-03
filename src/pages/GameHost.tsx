@@ -18,7 +18,6 @@ import { Users, Trophy, Crown, UserX, X, Edit3Icon, Rocket, Loader2 } from 'luci
 import confetti from 'canvas-confetti'
 import {
   RoomProvider,
-  useRoom,
   useOthers,
   useStorage,
   useMutation,
@@ -49,7 +48,6 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const showAds = !!isSignedIn && !isSubscribed
 
   const status = useStatus()
-  const room = useRoom()
 
   const roundsStorage = useStorage((root) => root.rounds)
   const currentRoundIndexObj = useStorage((root) => root.currentRoundIndex)
@@ -229,7 +227,6 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
       }))
     }
 
-    await room.getStorage()
     storeRounds(roundsData)
     setTimeLeft(settings?.timeLimit ?? 15)
   }
