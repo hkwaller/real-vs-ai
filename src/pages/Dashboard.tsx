@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
 import { useUser, useAuth, UserButton } from '@clerk/react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import GameLayout from '@/components/GameLayout'
+import DailyChallengeCard from '@/components/DailyChallengeCard'
 import { cn } from '@/lib/utils'
+import { getDailyScores } from '@/lib/dailyChallenge'
 import {
   Crown,
   Zap,
@@ -301,6 +303,63 @@ const Dashboard: React.FC = () => {
             )}
           </div>
         </motion.div>
+
+        {/* Daily Challenge */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+          <DailyChallengeCard />
+        </motion.div>
+
+        {/* Daily Challenge History */}
+        {(() => {
+          const dailyScores = getDailyScores()
+          const entries = Object.entries(dailyScores)
+            .sort((a, b) => b[0].localeCompare(a[0]))
+            .slice(0, 10)
+          if (entries.length === 0) return null
+          return (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
+              <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <Calendar className="w-5 h-5 text-[#FFB830]" />
+                  <div>
+                    <p className="mission-label mb-0.5">Daily Ops</p>
+                    <h2 className="font-orbitron text-lg font-bold text-[#F5F0E8] uppercase tracking-wide">
+                      Challenge History
+                    </h2>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {entries.map(([date, result]) => {
+                    const pct = Math.round((result.score / result.maxScore) * 100)
+                    return (
+                      <Link key={date} to={`/daily/${date}`} className="block">
+                        <div className="flex items-center justify-between p-3 bg-[#1A2355] border border-[#2A3468] hover:border-[#FFB830]/40 transition-colors gap-4">
+                          <span className="flex items-center gap-1.5 font-space-mono text-xs text-[#8B97C8]">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(date + 'T12:00:00').toLocaleDateString(undefined, {
+                              month: 'short', day: 'numeric', year: 'numeric',
+                            })}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <div className="w-20 bg-[#2A3468] h-1.5 hidden sm:block">
+                              <div
+                                className="bg-[#FFB830] h-1.5 transition-all"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="font-space-mono text-xs text-[#FFB830] font-bold">
+                              {result.score}/{result.maxScore}
+                            </span>
+                          </div>
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          )
+        })()}
 
         {/* Pricing */}
         {!isSubscribed && (

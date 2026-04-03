@@ -4,11 +4,11 @@ import { motion, Variants } from 'framer-motion'
 import { useAuth, UserButton } from '@clerk/react'
 import { Button } from '@/components/ui/button'
 import GameLayout from '@/components/GameLayout'
-import { LayoutDashboard, Rocket, Users, Trophy, Target } from 'lucide-react'
+import DailyChallengeCard from '@/components/DailyChallengeCard'
+import { LayoutDashboard, Rocket, Users, Trophy } from 'lucide-react'
 
 interface GameRecord {
   players?: { name: string; score: number }[]
-  scores?: Record<string, number>
 }
 
 function useLeaderboard() {
@@ -88,20 +88,16 @@ const LandingPage: React.FC = () => {
       >
         {/* Hero */}
         <motion.div variants={itemVariants} className="text-center space-y-4">
-          <div className="inline-block relative">
-            <h1
-              className="font-orbitron text-6xl md:text-8xl font-black uppercase tracking-tight text-[#FF6B1A] text-glow-orange"
-            >
-              Real vs AI
-            </h1>
-          </div>
+          <h1 className="font-orbitron text-6xl md:text-8xl font-black uppercase tracking-tight text-[#FF6B1A] text-glow-orange">
+            Real vs AI
+          </h1>
           <p className="text-[#8B97C8] text-lg md:text-xl max-w-xl mx-auto tracking-wide">
             Can you tell the difference? <br className="hidden md:block" />
             Challenge your operatives in the ultimate Turing Test.
           </p>
         </motion.div>
 
-        {/* Main grid: Multiplayer + Today's Challenge */}
+        {/* Main grid: Multiplayer + Daily Challenge */}
         <motion.div
           variants={itemVariants}
           className="grid grid-cols-1 md:grid-cols-2 gap-6"
@@ -124,20 +120,11 @@ const LandingPage: React.FC = () => {
             </div>
 
             <div className="space-y-3">
-              <Button
-                size="lg"
-                className="w-full"
-                onClick={() => navigate('/create')}
-              >
+              <Button size="lg" className="w-full" onClick={() => navigate('/create')}>
                 <Rocket className="w-4 h-4 mr-2" />
                 Launch Mission
               </Button>
-              <Button
-                variant="secondary"
-                size="lg"
-                className="w-full"
-                onClick={() => navigate('/join')}
-              >
+              <Button variant="secondary" size="lg" className="w-full" onClick={() => navigate('/join')}>
                 <Users className="w-4 h-4 mr-2" />
                 Join Mission
               </Button>
@@ -148,46 +135,8 @@ const LandingPage: React.FC = () => {
             </p>
           </div>
 
-          {/* Today's Challenge card */}
-          <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-6 space-y-5">
-            <div>
-              <p className="mission-label mb-2">Daily Ops</p>
-              <h2 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase tracking-wide">
-                Today's Challenge
-              </h2>
-              <p className="text-[#8B97C8] text-sm mt-2">
-                One image pair. One shot. Compete for today's top rank.
-              </p>
-            </div>
-
-            {/* Image placeholder */}
-            <div className="grid grid-cols-2 gap-3">
-              {['A', 'B'].map((label) => (
-                <div
-                  key={label}
-                  className="relative aspect-square bg-[#1A2355] border border-[#2A3468] flex items-center justify-center"
-                >
-                  <Target className="w-8 h-8 text-[#2A3468]" />
-                  <span className="absolute top-2 left-2 font-orbitron text-xs font-bold text-[#8B97C8]">
-                    {label}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-full"
-              onClick={() => isSignedIn ? undefined : navigate('/sign-in')}
-            >
-              {isSignedIn ? 'Vote Now' : 'Sign In to Play'}
-            </Button>
-
-            <p className="font-space-mono text-xs text-[#8B97C8]">
-              // Resets 00:00 UTC — coming soon
-            </p>
-          </div>
+          {/* Daily Challenge */}
+          <DailyChallengeCard />
         </motion.div>
 
         {/* Leaderboard */}
