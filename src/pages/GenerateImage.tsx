@@ -39,16 +39,13 @@ const GenerateImage: React.FC = () => {
     formData.append('image', file)
 
     try {
-      const response = await fetch(
-        'https://n8n.srv1131293.hstgr.cloud/webhook/real-vs-ai/generate',
-        {
-          method: 'POST',
-          headers: {
-            'real-vs-ai-key': import.meta.env.VITE_API_KEY,
-          },
-          body: formData,
+      const response = await fetch(import.meta.env.VITE_N8N_API_URL as string, {
+        method: 'POST',
+        headers: {
+          'real-vs-ai-key': import.meta.env.VITE_API_KEY,
         },
-      )
+        body: formData,
+      })
 
       if (response.ok) {
         console.log(response)

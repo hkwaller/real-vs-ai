@@ -36,7 +36,7 @@ const PlayerGameContent: React.FC<{
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null)
   const [timeRemaining, setTimeRemaining] = useState<number>(15)
   const voteChoiceRef = useRef<'A' | 'B' | null>(null)
-  const timeRemainingRef = useRef<number>(15)
+  const roundStartTimeRef = useRef<number>(Date.now())
 
   const updatePresence = useUpdateMyPresence()
 
@@ -71,11 +71,10 @@ const PlayerGameContent: React.FC<{
     registerPlayer()
   }, [gameStatus, registered])
 
-  // Countdown timer — resets when round changes, stops when player has voted
+  // Countdown timer — resets when round changes
   useEffect(() => {
-    const start = timeLimit
-    setTimeRemaining(start)
-    timeRemainingRef.current = start
+    roundStartTimeRef.current = Date.now()
+    setTimeRemaining(timeLimit)
     setHasVoted(false)
     setVoteChoice(null)
     voteChoiceRef.current = null
@@ -83,24 +82,16 @@ const PlayerGameContent: React.FC<{
     updatePresence({ hasVoted: false, currentVote: null, timeRemaining: null })
 
     const interval = setInterval(() => {
-      setTimeRemaining((t) => {
-        const next = Math.max(0, t - 1)
-        timeRemainingRef.current = next
-        return next
-      })
-    }, 1000)
+      const elapsed = (Date.now() - roundStartTimeRef.current) / 1000
+      setTimeRemaining(Math.max(0, Math.ceil(timeLimit - elapsed)))
+    }, 250) // 250ms for smooth display
     return () => clearInterval(interval)
-  }, [currentRoundIndex, timeLimit])
-
-  // Stop the timer once voted (by clearing it via the hasVoted flag)
-  useEffect(() => {
-    if (!hasVoted) return
-    // Timer ref already captured at vote time; nothing extra needed
-  }, [hasVoted])
+  }, [currentRound?.id, timeLimit])
 
   const handleVote = (choice: 'A' | 'B') => {
     if (hasVoted) return
-    const remaining = timeRemainingRef.current
+    const elapsed = (Date.now() - roundStartTimeRef.current) / 1000
+    const remaining = Math.max(0, timeLimit - elapsed)
     setVoteChoice(choice)
     voteChoiceRef.current = choice
     setHasVoted(true)
@@ -127,7 +118,8 @@ const PlayerGameContent: React.FC<{
       return
     }
     const correct = myChoice === correctChoice
-    const tr = timeRemainingRef.current
+    const elapsed = (Date.now() - roundStartTimeRef.current) / 1000
+    const tr = Math.max(0, timeLimit - elapsed)
     const points = correct ? Math.max(10, Math.round(100 * (tr / timeLimit))) : 0
     setRoundResult({ didVote: true, correct, correctChoice, points })
   })

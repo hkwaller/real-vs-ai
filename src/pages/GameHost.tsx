@@ -15,7 +15,7 @@ import GameLayout from '@/components/GameLayout'
 import AdBanner from '@/components/AdBanner'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-import { Users, Trophy, Crown, UserX, X, Edit3Icon } from 'lucide-react'
+import { Users, Trophy, Crown, UserX, X, Edit3Icon, Loader2 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import {
   RoomProvider,
@@ -41,6 +41,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const [initialized, setInitialized] = useState(false)
   const [showPlayersModal, setShowPlayersModal] = useState(false)
   const [confirmKickId, setConfirmKickId] = useState<string | null>(null)
+  const [isReplacing, setIsReplacing] = useState(false)
 
   // Ad banner: show for signed-in users without an active subscription
   const { isSignedIn } = useAuth()
@@ -142,6 +143,40 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     storage.get('currentRoundIndex').set('value', 0)
     storage.get('gameStatus').set('value', 'waiting')
   }, [])
+
+  const replaceRound = useMutation(({ storage }, newRound: RoundData) => {
+    storage.get('rounds').set(currentRoundIndex, newRound)
+  }, [currentRoundIndex])
+
+  const fetchReplacementImage = async (): Promise<RoundData | null> => {
+    const { data: files } = await supabase.storage.from('real-vs-ai').list('real')
+    if (!files) return null
+
+    const validFiles = files.filter(
+      (f) => !f.name.startsWith('.') && f.name !== '.emptyFolderPlaceholder',
+    )
+
+    // Exclude filenames already used in this game
+    const usedNames = new Set(
+      (roundsStorage ?? []).map((r) => r.realImageUrl.split('/real/').pop() ?? ''),
+    )
+    const available = validFiles.filter((f) => !usedNames.has(f.name))
+    const pool = available.length > 0 ? available : validFiles
+
+    const file = pool[Math.floor(Math.random() * pool.length)]
+    return {
+      id: crypto.randomUUID(),
+      realImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`real/${file.name}`).data.publicUrl,
+      aiImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`ai/${file.name}`).data.publicUrl,
+    }
+  }
+
+  const handleSkipPicture = async () => {
+    setIsReplacing(true)
+    const newRound = await fetchReplacementImage()
+    if (newRound) replaceRound(newRound)
+    setIsReplacing(false)
+  }
 
   const removePlayer = useMutation(({ storage }, id: string) => {
     const playerList = storage.get('players')
@@ -451,6 +486,16 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
             {timeLeft}s
           </div>
           <div className="flex items-center gap-4">
+            {!showResult && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSkipPicture}
+                disabled={isReplacing}
+              >
+                {isReplacing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Skip Picture'}
+              </Button>
+            )}
             {settings?.revealMode === 'after_round' && !showResult && (
               <Button
                 variant="destructive"

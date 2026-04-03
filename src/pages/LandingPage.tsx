@@ -5,6 +5,7 @@ import { useAuth, UserButton } from '@clerk/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import GameLayout from '@/components/GameLayout'
+import DailyChallengeCard from '@/components/DailyChallengeCard'
 import { User, Zap, LayoutDashboard } from 'lucide-react'
 
 const LandingPage: React.FC = () => {
@@ -81,7 +82,7 @@ const LandingPage: React.FC = () => {
 
         <motion.div
           variants={itemVariants}
-          className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl"
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl"
         >
           <Card
             className="text-white group hover:border-indigo-500/50 transition-colors cursor-pointer"
@@ -125,6 +126,8 @@ const LandingPage: React.FC = () => {
               </Button>
             </CardContent>
           </Card>
+
+          <DailyChallengeCard />
         </motion.div>
 
         <motion.div

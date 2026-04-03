@@ -11,6 +11,8 @@ import CreateGame from './pages/CreateGame'
 import Dashboard from './pages/Dashboard'
 import SignInPage from './pages/SignInPage'
 import SignUpPage from './pages/SignUpPage'
+import DailyChallenge from './pages/DailyChallenge'
+import DailyChallengeArchive from './pages/DailyChallengeArchive'
 
 function ProtectedRoute({ element }: { element: React.ReactElement }) {
   const { isSignedIn, isLoaded } = useAuth()
@@ -34,6 +36,9 @@ function App() {
         <Route path="/lobby/:code" element={<Lobby />} />
         <Route path="/game/:code" element={<GameHost />} />
         <Route path="/play/:code" element={<PlayerGame />} />
+        <Route path="/daily/archive" element={<DailyChallengeArchive />} />
+        <Route path="/daily/:date" element={<DailyChallenge />} />
+        <Route path="/daily" element={<DailyChallenge />} />
       </Routes>
     </Router>
   )
