@@ -36,6 +36,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const [showResult, setShowResult] = useState(false)
   const [showScoreDialog, setShowScoreDialog] = useState(false)
   const [initialized, setInitialized] = useState(false)
+  const initRunningRef = useRef(false)
   const [showPlayersModal, setShowPlayersModal] = useState(false)
   const [confirmKickId, setConfirmKickId] = useState<string | null>(null)
   const [isReplacing, setIsReplacing] = useState(false)
@@ -178,7 +179,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     scoreMap.delete(id)
   }, [])
 
-  const generateRoundsAsync = async (count: number) => {
+  const generateRoundsAsync = async (count: number, isCancelled: () => boolean = () => false) => {
     const { data: files } = await supabase.storage.from('real-vs-ai').list('real')
 
     let roundsData: RoundData[]
@@ -232,20 +233,30 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
       }))
     }
 
+    if (isCancelled()) return
     storeRounds(roundsData)
+    setInitialized(true)
     setTimeLeft(settings?.timeLimit ?? 15)
   }
 
   useEffect(() => {
-    if (initialized || status !== 'connected' || roundsStorage === null || settings === null) return
-    setInitialized(true)
+    if (initRunningRef.current || status !== 'connected' || roundsStorage === null || settings === null) return
+
+    initRunningRef.current = true
+    let cancelled = false
 
     if (roundsStorage.length === 0) {
-      generateRoundsAsync(settings.rounds)
+      generateRoundsAsync(settings.rounds, () => cancelled)
     } else {
+      setInitialized(true)
       setTimeLeft(settings.timeLimit)
     }
-  }, [status, roundsStorage, settings, initialized])
+
+    return () => {
+      cancelled = true
+      initRunningRef.current = false
+    }
+  }, [status, roundsStorage?.length ?? -1, settings?.rounds])
 
   const prevRoundIdRef = useRef<string | null>(null)
   useEffect(() => {

@@ -1,9 +1,9 @@
-import React from 'react';
-import { cn } from '@/lib/utils';
+import React from 'react'
+import { cn } from '@/lib/utils'
 
 interface GameLayoutProps {
-  children: React.ReactNode;
-  className?: string;
+  children: React.ReactNode
+  className?: string
 }
 
 const GameLayout: React.FC<GameLayoutProps> = ({ children, className }) => {
@@ -25,11 +25,9 @@ const GameLayout: React.FC<GameLayoutProps> = ({ children, className }) => {
       {/* Subtle cyan glow bottom-right */}
       <div className="absolute bottom-[-5%] right-[-5%] w-[30%] h-[30%] rounded-full bg-[#00FFE5]/6 blur-[120px] pointer-events-none" />
 
-      <div className={cn("relative z-10 w-full max-w-5xl", className)}>
-        {children}
-      </div>
+      <div className={cn('relative z-10 w-full max-w-5xl', className)}>{children}</div>
     </div>
-  );
-};
+  )
+}
 
-export default GameLayout;
+export default GameLayout
