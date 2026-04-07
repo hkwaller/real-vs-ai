@@ -49,6 +49,9 @@ const AdminView: React.FC = () => {
   const [aiFile, setAiFile] = useState<File | null>(null)
   const [aiUploadStatus, setAiUploadStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [aiAssignedDate, setAiAssignedDate] = useState<string | null>(null)
+  const [aiCompressedKb, setAiCompressedKb] = useState<{ before: number; after: number } | null>(
+    null,
+  )
   const aiFileInputRef = useRef<HTMLInputElement>(null)
 
   // Tab State
@@ -68,12 +71,16 @@ const AdminView: React.FC = () => {
 
   // List State
   const [images, setImages] = useState<ImagePair[]>([])
-  console.log('🚀 ~ AdminView ~ images:', images)
   const [loadingImages, setLoadingImages] = useState(true)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [selectedPair, setSelectedPair] = useState<ImagePair | null>(null)
   const [replacingAi, setReplacingAi] = useState<string | null>(null)
   const replaceAiInputRef = useRef<HTMLInputElement>(null)
+  const [missingSlots, setMissingSlots] = useState<Record<string, 'real' | 'ai' | 'both'>>({})
+  const [uploadingSlot, setUploadingSlot] = useState<{ name: string; side: 'real' | 'ai' } | null>(
+    null,
+  )
+  const missingSlotInputRef = useRef<HTMLInputElement>(null)
 
   const fetchImages = async () => {
     setLoadingImages(true)
@@ -223,6 +230,9 @@ const AdminView: React.FC = () => {
   const handleAiFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setAiFile(e.target.files[0])
+      setAiUploadStatus('idle')
+      setAiCompressedKb(null)
+      setAiAssignedDate(null)
     }
   }
 
@@ -260,6 +270,29 @@ const AdminView: React.FC = () => {
     }
   }
 
+  const compressImage = (file: File, maxSize = 1024, quality = 0.85): Promise<Blob> =>
+    new Promise((resolve, reject) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        URL.revokeObjectURL(url)
+        const scale = Math.min(1, maxSize / Math.max(img.naturalWidth, img.naturalHeight))
+        const w = Math.round(img.naturalWidth * scale)
+        const h = Math.round(img.naturalHeight * scale)
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error('Compression failed'))),
+          'image/jpeg',
+          quality,
+        )
+      }
+      img.onerror = () => reject(new Error('Failed to load image for compression'))
+      img.src = url
+    })
+
   const handleAiUpload = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!aiFile) return
@@ -268,11 +301,17 @@ const AdminView: React.FC = () => {
     setAiUploadStatus('idle')
 
     try {
+      const compressed = await compressImage(aiFile)
+      setAiCompressedKb({
+        before: Math.round(aiFile.size / 1024),
+        after: Math.round(compressed.size / 1024),
+      })
       const { error } = await supabase.storage
         .from('real-vs-ai')
-        .upload(`ai/${generatedName}.jpg`, aiFile, {
+        .upload(`ai/${generatedName}.jpg`, compressed, {
           cacheControl: '0',
           upsert: true,
+          contentType: 'image/jpeg',
         })
 
       if (error) throw error
@@ -352,10 +391,14 @@ const AdminView: React.FC = () => {
     const filename = replacingAi
 
     try {
-      const { error } = await supabase.storage.from('real-vs-ai').upload(`ai/${filename}`, file, {
-        cacheControl: '0',
-        upsert: true,
-      })
+      const compressed = await compressImage(file)
+      const { error } = await supabase.storage
+        .from('real-vs-ai')
+        .upload(`ai/${filename}`, compressed, {
+          cacheControl: '0',
+          upsert: true,
+          contentType: 'image/jpeg',
+        })
 
       if (error) throw error
 
@@ -371,11 +414,57 @@ const AdminView: React.FC = () => {
     }
   }
 
+  const markMissing = (name: string, side: 'real' | 'ai') => {
+    setMissingSlots((prev) => {
+      const existing = prev[name]
+      if (existing === 'both') return prev
+      if ((existing === 'real' && side === 'ai') || (existing === 'ai' && side === 'real'))
+        return { ...prev, [name]: 'both' }
+      return { ...prev, [name]: side }
+    })
+  }
+
+  const handleMissingSlotClick = (name: string, side: 'real' | 'ai', e: React.MouseEvent) => {
+    e.stopPropagation()
+    setUploadingSlot({ name, side })
+    missingSlotInputRef.current?.click()
+  }
+
+  const handleMissingSlotFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0] || !uploadingSlot) return
+    const file = e.target.files[0]
+    const { name, side } = uploadingSlot
+    try {
+      const toUpload = side === 'ai' ? await compressImage(file) : file
+      const { error } = await supabase.storage
+        .from('real-vs-ai')
+        .upload(`${side}/${name}`, toUpload, {
+          cacheControl: '0',
+          upsert: true,
+          ...(side === 'ai' && { contentType: 'image/jpeg' }),
+        })
+      if (error) throw error
+      setMissingSlots((prev) => {
+        const updated = { ...prev }
+        if (updated[name] === 'both') updated[name] = side === 'real' ? 'ai' : 'real'
+        else delete updated[name]
+        return updated
+      })
+      await fetchImages()
+    } catch (err) {
+      console.error('Failed to upload missing image:', err)
+      alert('Upload failed')
+    } finally {
+      setUploadingSlot(null)
+      if (missingSlotInputRef.current) missingSlotInputRef.current.value = ''
+    }
+  }
+
   // Images used in other days (not the currently-edited date)
   const usedInOtherDays = new Set(
     Object.entries(schedule)
       .filter(([date]) => date !== selectedDate)
-      .flatMap(([, entry]) => entry.images),
+      .flatMap(([, entry]) => Array.isArray(entry?.images) ? entry.images : []),
   )
 
   return (
@@ -564,13 +653,28 @@ const AdminView: React.FC = () => {
                       {aiUploadStatus === 'success' && (
                         <div className="p-3 bg-green-500/10 border border-green-500/20 rounded text-green-400 text-xs space-y-1">
                           <div className="font-bold">AI image uploaded!</div>
+                          {aiCompressedKb && (
+                            <div className="text-muted-foreground font-mono">
+                              {aiCompressedKb.before > 1024
+                                ? `${(aiCompressedKb.before / 1024).toFixed(1)} MB`
+                                : `${aiCompressedKb.before} KB`}{' '}
+                              → <span className="text-green-400">{aiCompressedKb.after} KB</span> (
+                              {Math.round((1 - aiCompressedKb.after / aiCompressedKb.before) * 100)}
+                              % smaller)
+                            </div>
+                          )}
                           {aiAssignedDate && (
                             <div className="text-muted-foreground">
                               Auto-assigned to{' '}
                               <span className="text-green-400 font-medium">
-                                {new Date(aiAssignedDate + 'T12:00:00').toLocaleDateString(undefined, {
-                                  weekday: 'short', month: 'short', day: 'numeric',
-                                })}
+                                {new Date(aiAssignedDate + 'T12:00:00').toLocaleDateString(
+                                  undefined,
+                                  {
+                                    weekday: 'short',
+                                    month: 'short',
+                                    day: 'numeric',
+                                  },
+                                )}
                               </span>
                             </div>
                           )}
@@ -673,36 +777,48 @@ const AdminView: React.FC = () => {
                               </div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                              <div className="space-y-1">
-                                <div className="text-xs text-muted-foreground text-center">
-                                  Real
-                                </div>
-                                <div className="aspect-square rounded overflow-hidden bg-black/20 relative">
-                                  <img
-                                    src={img.realUrl}
-                                    className="w-full h-full object-cover"
-                                    alt="Real"
-                                    onError={(e) => {
-                                      ;(e.target as HTMLImageElement).src =
-                                        'https://placehold.co/400x400?text=Missing'
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                              <div className="space-y-1">
-                                <div className="text-xs text-muted-foreground text-center">AI</div>
-                                <div className="aspect-square rounded overflow-hidden bg-black/20 relative">
-                                  <img
-                                    src={img.aiUrl}
-                                    className="w-full h-full object-cover"
-                                    alt="AI"
-                                    onError={(e) => {
-                                      ;(e.target as HTMLImageElement).src =
-                                        'https://placehold.co/400x400?text=Missing'
-                                    }}
-                                  />
-                                </div>
-                              </div>
+                              {(['real', 'ai'] as const).map((side) => {
+                                const url = side === 'real' ? img.realUrl : img.aiUrl
+                                const isMissing =
+                                  missingSlots[img.name] === side ||
+                                  missingSlots[img.name] === 'both'
+                                const isUploading =
+                                  uploadingSlot?.name === img.name && uploadingSlot?.side === side
+                                return (
+                                  <div key={side} className="space-y-1">
+                                    <div className="text-xs text-muted-foreground text-center capitalize">
+                                      {side}
+                                    </div>
+                                    <div className="aspect-square rounded overflow-hidden bg-black/20 relative">
+                                      {isMissing ? (
+                                        <button
+                                          className="w-full h-full flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-red-500/40 hover:border-red-400/70 bg-red-500/5 hover:bg-red-500/10 transition-colors"
+                                          onClick={(e) => handleMissingSlotClick(img.name, side, e)}
+                                          title={`Upload missing ${side} image`}
+                                        >
+                                          {isUploading ? (
+                                            <Loader2 className="w-5 h-5 animate-spin text-red-400" />
+                                          ) : (
+                                            <>
+                                              <Upload className="w-5 h-5 text-red-400" />
+                                              <span className="text-xs text-red-400 font-medium">
+                                                Missing
+                                              </span>
+                                            </>
+                                          )}
+                                        </button>
+                                      ) : (
+                                        <img
+                                          src={url}
+                                          className="w-full h-full object-cover"
+                                          alt={side}
+                                          onError={() => markMissing(img.name, side)}
+                                        />
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
                             </div>
                           </div>
                         ))}
@@ -775,9 +891,12 @@ const AdminView: React.FC = () => {
                                   )?.[0]
                                 : undefined
                               return (
-                                <label
+                                <div
                                   key={img.name}
-                                  className={`flex items-center gap-3 p-2 rounded-lg border transition-colors ${
+                                  role="checkbox"
+                                  aria-checked={checked}
+                                  onClick={() => !disabled && toggleImageSelection(img.name)}
+                                  className={`flex items-center gap-3 p-2 rounded-lg border transition-colors select-none ${
                                     disabled
                                       ? 'border-white/5 opacity-40 cursor-not-allowed'
                                       : checked
@@ -785,13 +904,9 @@ const AdminView: React.FC = () => {
                                         : 'border-white/10 hover:border-white/20 cursor-pointer'
                                   }`}
                                 >
-                                  <input
-                                    type="checkbox"
-                                    className="sr-only"
-                                    checked={checked}
-                                    disabled={disabled}
-                                    onChange={() => !disabled && toggleImageSelection(img.name)}
-                                  />
+                                  <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${checked ? 'bg-amber-500 border-amber-500' : 'border-white/30'}`}>
+                                    {checked && <span className="text-black text-[10px] font-bold">✓</span>}
+                                  </div>
                                   <img
                                     src={img.realUrl}
                                     alt={img.name}
@@ -812,7 +927,7 @@ const AdminView: React.FC = () => {
                                       {usedOnDate}
                                     </span>
                                   )}
-                                </label>
+                                </div>
                               )
                             })}
                           </div>
@@ -964,26 +1079,59 @@ const AdminView: React.FC = () => {
 
                           {/* Selected day actions */}
                           {schedule[selectedDate] && (
-                            <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(selectedDate + 'T12:00:00').toLocaleDateString(
-                                  undefined,
-                                  { weekday: 'short', month: 'short', day: 'numeric' },
-                                )}
-                                {' · '}
-                                <span className="text-amber-400">
-                                  {schedule[selectedDate].images.length} images
-                                </span>
-                              </p>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => handleDeleteChallenge(selectedDate)}
-                              >
-                                <Trash2 className="w-3 h-3 mr-1" />
-                                Delete
-                              </Button>
+                            <div className="mt-4 pt-3 border-t border-white/10 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(selectedDate + 'T12:00:00').toLocaleDateString(
+                                    undefined,
+                                    { weekday: 'short', month: 'short', day: 'numeric' },
+                                  )}
+                                  {' · '}
+                                  <span className="text-amber-400">
+                                    {schedule[selectedDate].images.length} images
+                                  </span>
+                                </p>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => handleDeleteChallenge(selectedDate)}
+                                >
+                                  <Trash2 className="w-3 h-3 mr-1" />
+                                  Delete
+                                </Button>
+                              </div>
+                              {/* Thumbnail strip */}
+                              <div className="flex flex-col gap-2">
+                                {schedule[selectedDate].images.map((filename) => {
+                                  const pair = images.find((img) => img.name === filename)
+                                  return (
+                                    <div key={filename} className="flex items-center gap-2">
+                                      <div className="flex gap-1 shrink-0">
+                                        <div className="w-12 h-12 rounded overflow-hidden bg-black/30 border border-indigo-500/20">
+                                          <img
+                                            src={pair?.realUrl ?? supabase.storage.from('real-vs-ai').getPublicUrl(`real/${filename}`).data.publicUrl}
+                                            alt={`real ${filename}`}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/48x48?text=?' }}
+                                          />
+                                        </div>
+                                        <div className="w-12 h-12 rounded overflow-hidden bg-black/30 border border-purple-500/20">
+                                          <img
+                                            src={pair?.aiUrl ?? supabase.storage.from('real-vs-ai').getPublicUrl(`ai/${filename}`).data.publicUrl}
+                                            alt={`ai ${filename}`}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/48x48?text=?' }}
+                                          />
+                                        </div>
+                                      </div>
+                                      <span className="text-xs text-muted-foreground truncate flex-1 font-mono" title={filename}>
+                                        {filename}
+                                      </span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
                             </div>
                           )}
                         </CardContent>
@@ -1036,6 +1184,15 @@ const AdminView: React.FC = () => {
         type="file"
         ref={replaceAiInputRef}
         onChange={handleReplaceAiFileChange}
+        accept="image/*"
+        className="hidden"
+      />
+
+      {/* Hidden input for uploading missing real/AI slots */}
+      <input
+        type="file"
+        ref={missingSlotInputRef}
+        onChange={handleMissingSlotFileChange}
         accept="image/*"
         className="hidden"
       />

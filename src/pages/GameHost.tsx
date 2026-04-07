@@ -127,9 +127,12 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     storage.get('gameStatus').set('value', 'waiting')
   }, [])
 
-  const replaceRound = useMutation(({ storage }, newRound: RoundData) => {
-    storage.get('rounds').set(currentRoundIndex, newRound)
-  }, [currentRoundIndex])
+  const replaceRound = useMutation(
+    ({ storage }, newRound: RoundData) => {
+      storage.get('rounds').set(currentRoundIndex, newRound)
+    },
+    [currentRoundIndex],
+  )
 
   const fetchReplacementImage = async (): Promise<RoundData | null> => {
     const { data: files } = await supabase.storage.from('real-vs-ai').list('real')
@@ -149,8 +152,10 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     const file = pool[Math.floor(Math.random() * pool.length)]
     return {
       id: crypto.randomUUID(),
-      realImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`real/${file.name}`).data.publicUrl,
-      aiImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`ai/${file.name}`).data.publicUrl,
+      realImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`real/${file.name}`).data
+        .publicUrl,
+      aiImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`ai/${file.name}`).data
+        .publicUrl,
     }
   }
 
@@ -307,14 +312,22 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
         const choice = o.presence.currentVote
         const tr = o.presence.timeRemaining ?? 0
         const correct = choice === correctChoice
+        const gracePeriod = 3
+        const scoringWindow = tl - gracePeriod
+        const pts = tr >= scoringWindow ? 100 : Math.round(100 * (tr / scoringWindow))
         return {
           playerId: o.presence.playerId,
-          increment: correct ? Math.max(10, Math.round(100 * (tr / tl))) : 0,
+          increment: correct ? pts : 0,
         }
       })
 
     updateScores(updates)
-    broadcast({ type: 'ROUND_REVEALED' })
+
+    const scoresMap: Record<string, number> = {}
+    updates.forEach((u) => {
+      scoresMap[u.playerId] = u.increment
+    })
+    broadcast({ type: 'ROUND_REVEALED', correctChoice, scores: scoresMap })
 
     const anyCorrect = updates.some((u) => u.increment > 0)
     if (anyCorrect) {
@@ -683,8 +696,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                   <div className="text-center">
                     <p className="mission-label mb-2">Round Debrief</p>
                     <h2 className="font-orbitron text-3xl font-bold text-[#F5F0E8] uppercase">
-                      Option{' '}
-                      <span className="text-[#00FFE5]">{isRealLeft ? 'A' : 'B'}</span> was{' '}
+                      Option <span className="text-[#00FFE5]">{isRealLeft ? 'A' : 'B'}</span> was{' '}
                       <span className="text-[#00FFE5]">REAL</span>
                     </h2>
                   </div>

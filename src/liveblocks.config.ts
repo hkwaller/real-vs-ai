@@ -31,7 +31,7 @@ export type Storage = {
 };
 
 type RoomEvent =
-  | { type: "ROUND_REVEALED" }
+  | { type: "ROUND_REVEALED"; correctChoice: "A" | "B"; scores: Record<string, number> }
   | { type: "GAME_OVER" }
   | { type: "PLAYER_KICKED"; playerId: string };
 

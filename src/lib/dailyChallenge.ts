@@ -8,11 +8,23 @@ export type DailySchedule = {
   [date: string]: DailyScheduleEntry
 }
 
+export type RoundDetail = {
+  roundId: string
+  realImageUrl: string
+  aiImageUrl: string
+  isRealLeft: boolean
+  correctChoice: 'A' | 'B'
+  playerChoice: 'A' | 'B' | null
+  correct: boolean
+  points: number
+}
+
 export type DailyScore = {
   score: number
   maxScore: number
   rounds: number
   completedAt: string
+  roundDetails?: RoundDetail[]
 }
 
 export type DailyScores = {
@@ -95,8 +107,12 @@ export function buildRounds(date: string, images: string[]): DailyRound[] {
   })
 }
 
+const GRACE_PERIOD = 3 // seconds at start that always award full points
+const SCORING_WINDOW = TIME_LIMIT - GRACE_PERIOD
+
 export function calcPoints(timeRemaining: number): number {
-  return Math.max(10, Math.round(100 * (timeRemaining / TIME_LIMIT)))
+  if (timeRemaining >= SCORING_WINDOW) return 100
+  return Math.round(100 * (timeRemaining / SCORING_WINDOW))
 }
 
 export function msUntilMidnight(): number {

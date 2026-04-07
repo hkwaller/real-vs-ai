@@ -16,6 +16,7 @@ import {
   TIME_LIMIT,
   type DailyRound,
   type DailyScore,
+  type RoundDetail,
 } from '@/lib/dailyChallenge'
 
 type Phase = 'loading' | 'no_challenge' | 'already_done' | 'playing' | 'reveal' | 'finished'
@@ -40,6 +41,7 @@ const DailyChallenge: React.FC = () => {
   const [score, setScore] = useState(0)
   const [timeRemaining, setTimeRemaining] = useState(TIME_LIMIT)
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null)
+  const [roundDetails, setRoundDetails] = useState<RoundDetail[]>([])
   const [existingScore, setExistingScore] = useState<DailyScore | null>(null)
   const [countdown, setCountdown] = useState('')
 
@@ -98,6 +100,19 @@ const DailyChallenge: React.FC = () => {
         const isRealLeft = currentRound.id.charCodeAt(0) % 2 === 0
         const correctChoice: 'A' | 'B' = isRealLeft ? 'A' : 'B'
         setRoundResult({ didVote: false, correct: false, correctChoice, points: 0 })
+        setRoundDetails((prev) => [
+          ...prev,
+          {
+            roundId: currentRound.id,
+            realImageUrl: currentRound.realImageUrl,
+            aiImageUrl: currentRound.aiImageUrl,
+            isRealLeft,
+            correctChoice,
+            playerChoice: null,
+            correct: false,
+            points: 0,
+          },
+        ])
         setPhase('reveal')
       }
     }, 250)
@@ -121,6 +136,19 @@ const DailyChallenge: React.FC = () => {
 
     setRoundResult({ didVote: true, correct, correctChoice, points })
     setScore((s) => s + points)
+    setRoundDetails((prev) => [
+      ...prev,
+      {
+        roundId: currentRound.id,
+        realImageUrl: currentRound.realImageUrl,
+        aiImageUrl: currentRound.aiImageUrl,
+        isRealLeft,
+        correctChoice,
+        playerChoice: choice,
+        correct,
+        points,
+      },
+    ])
     setPhase('reveal')
   }
 
@@ -133,6 +161,7 @@ const DailyChallenge: React.FC = () => {
         maxScore,
         rounds: rounds.length,
         completedAt: new Date().toISOString(),
+        roundDetails,
       }
       saveDailyScore(date, result)
       setExistingScore(result)
@@ -211,14 +240,15 @@ const DailyChallenge: React.FC = () => {
 
   if (phase === 'already_done' && existingScore) {
     const pct = Math.round((existingScore.score / existingScore.maxScore) * 100)
+    const details = existingScore.roundDetails ?? []
     return (
       <GameLayout>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center gap-6 text-center max-w-md w-full"
+          className="flex flex-col items-center gap-6 text-center max-w-lg w-full"
         >
-          <div className="corner-bracket bg-[#111840] border border-[#FFB830]/50 p-10 w-full space-y-5">
+          <div className="corner-bracket bg-[#111840] border border-[#FFB830]/50 p-8 w-full space-y-5">
             <Trophy className="w-14 h-14 text-[#FFB830] mx-auto" />
             <div>
               <p className="mission-label mb-2">Debrief</p>
@@ -245,6 +275,78 @@ const DailyChallenge: React.FC = () => {
                 />
               </div>
             </div>
+
+            {/* Round-by-round recap */}
+            {details.length > 0 && (
+              <div className="space-y-3 text-left">
+                <p className="mission-label text-center">Round Recap</p>
+                {details.map((rd, i) => {
+                  const imgA = rd.isRealLeft ? rd.realImageUrl : rd.aiImageUrl
+                  const imgB = rd.isRealLeft ? rd.aiImageUrl : rd.realImageUrl
+                  const isRealA = rd.isRealLeft
+                  return (
+                    <div key={rd.roundId} className="border border-[#2A3468] bg-[#0B0F2E]/60 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-space-mono text-xs text-[#8B97C8]">Round {i + 1}</span>
+                        <span
+                          className={`font-space-mono text-xs font-bold ${
+                            !rd.playerChoice
+                              ? 'text-[#FFB830]'
+                              : rd.correct
+                                ? 'text-[#00FFE5]'
+                                : 'text-[#FF3D1A]'
+                          }`}
+                        >
+                          {!rd.playerChoice ? '⏰ No answer' : rd.correct ? `✓ +${rd.points} pts` : '✗ Wrong'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['A', 'B'] as const).map((opt) => {
+                          const imgUrl = opt === 'A' ? imgA : imgB
+                          const isReal = opt === 'A' ? isRealA : !isRealA
+                          const wasChosen = rd.playerChoice === opt
+                          return (
+                            <div
+                              key={opt}
+                              className={`relative overflow-hidden border-2 ${
+                                wasChosen
+                                  ? rd.correct
+                                    ? 'border-[#00FFE5]'
+                                    : 'border-[#FF3D1A]'
+                                  : rd.correctChoice === opt
+                                    ? 'border-[#00FFE5]/40'
+                                    : 'border-[#2A3468]'
+                              }`}
+                            >
+                              <img
+                                src={imgUrl}
+                                alt={`Option ${opt}`}
+                                className="w-full aspect-square object-cover"
+                              />
+                              <div className={`absolute inset-0 flex flex-col items-center justify-between p-1.5 ${isReal ? 'bg-[#00FFE5]/5' : 'bg-[#FF3D1A]/5'}`}>
+                                <span className={`font-orbitron text-xs font-black self-start ${wasChosen ? 'text-white' : 'text-white/50'}`}>
+                                  {opt}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  {wasChosen && (
+                                    <span className={`font-space-mono text-[9px] font-bold px-1.5 py-0.5 ${rd.correct ? 'bg-[#00FFE5]/80 text-[#0B0F2E]' : 'bg-[#FF3D1A]/80 text-white'}`}>
+                                      YOUR PICK
+                                    </span>
+                                  )}
+                                  <span className={`font-space-mono text-[9px] font-bold px-1.5 py-0.5 ${isReal ? 'bg-[#00FFE5]/70 text-[#0B0F2E]' : 'bg-[#1A2355] text-[#8B97C8]'}`}>
+                                    {isReal ? 'REAL' : 'AI'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             {isToday && (
               <div className="text-center space-y-1">
@@ -274,14 +376,15 @@ const DailyChallenge: React.FC = () => {
 
   if (phase === 'finished' && existingScore) {
     const pct = Math.round((existingScore.score / existingScore.maxScore) * 100)
+    const details = existingScore.roundDetails ?? []
     return (
       <GameLayout>
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center gap-6 text-center max-w-md w-full"
+          className="flex flex-col items-center gap-6 text-center max-w-lg w-full"
         >
-          <div className="corner-bracket bg-[#111840] border border-[#FFB830]/50 p-10 w-full space-y-5">
+          <div className="corner-bracket bg-[#111840] border border-[#FFB830]/50 p-8 w-full space-y-5">
             <Trophy className="w-14 h-14 text-[#FFB830] mx-auto" />
             <div>
               <p className="mission-label mb-2">Debrief</p>
@@ -304,6 +407,78 @@ const DailyChallenge: React.FC = () => {
                 />
               </div>
             </div>
+
+            {/* Round-by-round recap */}
+            {details.length > 0 && (
+              <div className="space-y-3 text-left">
+                <p className="mission-label text-center">Round Recap</p>
+                {details.map((rd, i) => {
+                  const imgA = rd.isRealLeft ? rd.realImageUrl : rd.aiImageUrl
+                  const imgB = rd.isRealLeft ? rd.aiImageUrl : rd.realImageUrl
+                  const isRealA = rd.isRealLeft
+                  return (
+                    <div key={rd.roundId} className="border border-[#2A3468] bg-[#0B0F2E]/60 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-space-mono text-xs text-[#8B97C8]">Round {i + 1}</span>
+                        <span
+                          className={`font-space-mono text-xs font-bold ${
+                            !rd.playerChoice
+                              ? 'text-[#FFB830]'
+                              : rd.correct
+                                ? 'text-[#00FFE5]'
+                                : 'text-[#FF3D1A]'
+                          }`}
+                        >
+                          {!rd.playerChoice ? '⏰ No answer' : rd.correct ? `✓ +${rd.points} pts` : '✗ Wrong'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['A', 'B'] as const).map((opt) => {
+                          const imgUrl = opt === 'A' ? imgA : imgB
+                          const isReal = opt === 'A' ? isRealA : !isRealA
+                          const wasChosen = rd.playerChoice === opt
+                          return (
+                            <div
+                              key={opt}
+                              className={`relative overflow-hidden border-2 ${
+                                wasChosen
+                                  ? rd.correct
+                                    ? 'border-[#00FFE5]'
+                                    : 'border-[#FF3D1A]'
+                                  : rd.correctChoice === opt
+                                    ? 'border-[#00FFE5]/40'
+                                    : 'border-[#2A3468]'
+                              }`}
+                            >
+                              <img
+                                src={imgUrl}
+                                alt={`Option ${opt}`}
+                                className="w-full aspect-square object-cover"
+                              />
+                              <div className={`absolute inset-0 flex flex-col items-center justify-between p-1.5 ${isReal ? 'bg-[#00FFE5]/5' : 'bg-[#FF3D1A]/5'}`}>
+                                <span className={`font-orbitron text-xs font-black self-start ${wasChosen ? 'text-white' : 'text-white/50'}`}>
+                                  {opt}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  {wasChosen && (
+                                    <span className={`font-space-mono text-[9px] font-bold px-1.5 py-0.5 ${rd.correct ? 'bg-[#00FFE5]/80 text-[#0B0F2E]' : 'bg-[#FF3D1A]/80 text-white'}`}>
+                                      YOUR PICK
+                                    </span>
+                                  )}
+                                  <span className={`font-space-mono text-[9px] font-bold px-1.5 py-0.5 ${isReal ? 'bg-[#00FFE5]/70 text-[#0B0F2E]' : 'bg-[#1A2355] text-[#8B97C8]'}`}>
+                                    {isReal ? 'REAL' : 'AI'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             {isToday && (
               <div className="text-center space-y-1">

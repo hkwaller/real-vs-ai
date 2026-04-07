@@ -42,6 +42,7 @@ const PlayerGameContent: React.FC<{
   const currentRoundIndexObj = useStorage((root) => root.currentRoundIndex)
   const rounds = useStorage((root) => root.rounds)
   const settingsObj = useStorage((root) => root.settings)
+  const scoresMap = useStorage((root) => root.scores)
 
   const currentRoundIndex = currentRoundIndexObj?.value ?? 0
   const currentRound = rounds?.[currentRoundIndex] ?? null
@@ -102,18 +103,15 @@ const PlayerGameContent: React.FC<{
 
   useEventListener(({ event }) => {
     if (event.type !== 'ROUND_REVEALED') return
-    if (!currentRound) return
-    const isRealLeft = currentRound.id.charCodeAt(0) % 2 === 0
-    const correctChoice: 'A' | 'B' = isRealLeft ? 'A' : 'B'
+    const { correctChoice, scores } = event
     const myChoice = voteChoiceRef.current
     if (!myChoice) {
       setRoundResult({ didVote: false, correct: false, correctChoice, points: 0 })
       return
     }
     const correct = myChoice === correctChoice
-    const elapsed = (Date.now() - roundStartTimeRef.current) / 1000
-    const tr = Math.max(0, timeLimit - elapsed)
-    const points = correct ? Math.max(10, Math.round(100 * (tr / timeLimit))) : 0
+    // Use the points the host calculated — single source of truth
+    const points = scores[playerId] ?? 0
     setRoundResult({ didVote: true, correct, correctChoice, points })
   })
 
@@ -162,6 +160,19 @@ const PlayerGameContent: React.FC<{
     )
   }
 
+  // Standings
+  const sortedScores = scoresMap
+    ? [...scoresMap.entries()].sort((a, b) => b[1] - a[1])
+    : []
+  const myScore = scoresMap?.get(playerId) ?? 0
+  const myPosition = sortedScores.findIndex(([id]) => id === playerId) + 1
+  const playerCount = sortedScores.length
+  const leaderScore = sortedScores[0]?.[1] ?? 0
+  const secondScore = sortedScores[1]?.[1] ?? 0
+  const isLeader = myPosition === 1
+  const gap = isLeader ? myScore - secondScore : leaderScore - myScore
+  const showStandings = playerCount > 1
+
   return (
     <GameLayout>
       <div className="flex flex-col items-center gap-8 w-full max-w-sm mx-auto">
@@ -172,6 +183,35 @@ const PlayerGameContent: React.FC<{
             {playerName}
           </p>
           <p className="mission-label">Round {currentRoundIndex + 1}</p>
+        </div>
+
+        {/* Score HUD */}
+        <div className="w-full corner-bracket bg-[#111840] border border-[#2A3468] px-4 py-3 flex items-center justify-between gap-4">
+          <div className="text-center">
+            <p className="mission-label text-[10px]">Score</p>
+            <p className="font-space-mono font-bold text-xl text-[#FFB830]">{myScore}</p>
+          </div>
+
+          {showStandings && (
+            <>
+              <div className="h-8 w-px bg-[#2A3468]" />
+              <div className="text-center">
+                <p className="mission-label text-[10px]">Position</p>
+                <p className="font-space-mono font-bold text-xl text-[#F5F0E8]">
+                  #{myPosition}
+                  <span className="text-[#8B97C8] text-sm font-normal"> / {playerCount}</span>
+                </p>
+              </div>
+              <div className="h-8 w-px bg-[#2A3468]" />
+              <div className="text-center min-w-0">
+                <p className="mission-label text-[10px]">{isLeader ? 'Ahead' : 'Behind'}</p>
+                <p className={`font-space-mono font-bold text-xl ${isLeader ? 'text-[#00FFE5]' : 'text-[#FF3D1A]'}`}>
+                  {isLeader ? '+' : '-'}{gap}
+                  <span className="text-[#8B97C8] text-xs font-normal"> pts</span>
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
         <AnimatePresence mode="wait">
