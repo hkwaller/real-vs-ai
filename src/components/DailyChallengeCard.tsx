@@ -2,15 +2,14 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Calendar, Trophy, Loader2 } from 'lucide-react'
-import { fetchSchedule, getDailyScores, getTodayDate } from '@/lib/dailyChallenge'
+import { fetchSchedule, getDailyScores, getTodayDate, type RoundDetail } from '@/lib/dailyChallenge'
 
 type CardStatus = 'loading' | 'available' | 'completed' | 'no_challenge'
 
 const DailyChallengeCard: React.FC = () => {
   const navigate = useNavigate()
   const [status, setStatus] = useState<CardStatus>('loading')
-  const [score, setScore] = useState<number | null>(null)
-  const [maxScore, setMaxScore] = useState<number | null>(null)
+  const [roundDetails, setRoundDetails] = useState<RoundDetail[]>([])
 
   useEffect(() => {
     async function check() {
@@ -18,8 +17,7 @@ const DailyChallengeCard: React.FC = () => {
       const scores = getDailyScores()
 
       if (scores[today]) {
-        setScore(scores[today].score)
-        setMaxScore(scores[today].maxScore)
+        setRoundDetails(scores[today].roundDetails ?? [])
         setStatus('completed')
         return
       }
@@ -68,24 +66,34 @@ const DailyChallengeCard: React.FC = () => {
         </div>
       )}
 
-      {status === 'completed' && score !== null && maxScore !== null && (
+      {status === 'completed' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Trophy className="w-4 h-4 text-[#FFB830]" />
-              <span className="mission-label">Score</span>
+              <span className="mission-label">Result</span>
             </div>
             <span className="font-space-mono text-lg font-bold text-[#FFB830]">
-              {score}
-              <span className="text-[#8B97C8] text-sm font-normal">/{maxScore}</span>
+              {roundDetails.filter((r) => r.correct).length}
+              <span className="text-[#8B97C8] text-sm font-normal">/{roundDetails.length} correct</span>
             </span>
           </div>
-          <div className="w-full bg-[#0B0F2E] h-1.5 border border-[#2A3468]">
-            <div
-              className="bg-[#FFB830] h-full transition-all"
-              style={{ width: `${Math.round((score / maxScore) * 100)}%` }}
-            />
-          </div>
+          {roundDetails.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              {roundDetails.map((rd, i) => (
+                <div
+                  key={i}
+                  className={`w-6 h-6 flex items-center justify-center text-xs font-bold font-space-mono ${
+                    rd.correct
+                      ? 'bg-[#00FFE5]/20 text-[#00FFE5] border border-[#00FFE5]/40'
+                      : 'bg-[#FF3D1A]/20 text-[#FF3D1A] border border-[#FF3D1A]/40'
+                  }`}
+                >
+                  {rd.correct ? '✓' : '✗'}
+                </div>
+              ))}
+            </div>
+          )}
           <Button variant="outline" size="sm" className="w-full" asChild>
             <Link to="/daily/archive">Past Challenges</Link>
           </Button>
