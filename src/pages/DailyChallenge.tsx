@@ -519,7 +519,7 @@ const DailyChallenge: React.FC = () => {
 
   return (
     <GameLayout className="max-w-screen p-8">
-      <div className="flex flex-col items-center gap-6 w-full mx-auto">
+      <div className="flex flex-col items-center gap-6 w-full mx-auto max-w-7xl">
         {/* Header */}
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-2 text-[#FFB830] mb-1">
