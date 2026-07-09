@@ -3,7 +3,8 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import GameLayout from '@/components/GameLayout'
-import { Loader2, Trophy } from 'lucide-react'
+import CountdownRing from '@/components/CountdownRing'
+import { Loader2 } from 'lucide-react'
 import {
   RoomProvider,
   useStorage,
@@ -22,6 +23,8 @@ type RoundResult = {
   points: number
 }
 
+const GRACE_PERIOD = 3
+
 const PlayerGameContent: React.FC<{
   playerId: string
   playerName: string
@@ -33,6 +36,7 @@ const PlayerGameContent: React.FC<{
   const [registered, setRegistered] = useState(false)
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null)
   const [timeRemaining, setTimeRemaining] = useState<number>(15)
+  const [streak, setStreak] = useState(0)
   const voteChoiceRef = useRef<'A' | 'B' | null>(null)
   const roundStartTimeRef = useRef<number>(Date.now())
 
@@ -47,6 +51,7 @@ const PlayerGameContent: React.FC<{
   const currentRoundIndex = currentRoundIndexObj?.value ?? 0
   const currentRound = rounds?.[currentRoundIndex] ?? null
   const timeLimit = settingsObj?.timeLimit ?? 15
+  const totalRounds = settingsObj?.rounds ?? rounds?.length ?? 0
 
   const registerPlayer = useMutation(
     ({ storage }) => {
@@ -67,7 +72,7 @@ const PlayerGameContent: React.FC<{
     registerPlayer()
   }, [gameStatus, registered])
 
-  // Countdown timer — resets when round changes
+  // Countdown — resets when round changes
   useEffect(() => {
     roundStartTimeRef.current = Date.now()
     setTimeRemaining(timeLimit)
@@ -80,12 +85,13 @@ const PlayerGameContent: React.FC<{
     const interval = setInterval(() => {
       const elapsed = (Date.now() - roundStartTimeRef.current) / 1000
       setTimeRemaining(Math.max(0, Math.ceil(timeLimit - elapsed)))
-    }, 250) // 250ms for smooth display
+    }, 250)
     return () => clearInterval(interval)
   }, [currentRound?.id, timeLimit])
 
   const handleVote = (choice: 'A' | 'B') => {
     if (hasVoted) return
+    navigator.vibrate?.(10)
     const elapsed = (Date.now() - roundStartTimeRef.current) / 1000
     const remaining = Math.max(0, timeLimit - elapsed)
     setVoteChoice(choice)
@@ -106,30 +112,33 @@ const PlayerGameContent: React.FC<{
     const { correctChoice, scores } = event
     const myChoice = voteChoiceRef.current
     if (!myChoice) {
+      setStreak(0)
       setRoundResult({ didVote: false, correct: false, correctChoice, points: 0 })
       return
     }
     const correct = myChoice === correctChoice
-    // Use the points the host calculated — single source of truth
     const points = scores[playerId] ?? 0
+    setStreak((s) => (correct ? s + 1 : 0))
     setRoundResult({ didVote: true, correct, correctChoice, points })
   })
+
+  // Potential points right now (mirrors host scoring with this game's time limit).
+  const scoringWindow = Math.max(1, timeLimit - GRACE_PERIOD)
+  const potentialPoints =
+    timeRemaining >= scoringWindow ? 100 : Math.round(100 * (timeRemaining / scoringWindow))
+  const timeFraction = Math.max(0, Math.min(1, timeRemaining / timeLimit))
+  const myScore = scoresMap?.get(playerId) ?? 0
 
   // Game over
   if (gameStatus === 'finished') {
     return (
       <GameLayout>
-        <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-10 max-w-sm mx-auto text-center space-y-6">
-          <Trophy className="w-14 h-14 text-[#FFB830] mx-auto" />
-          <div>
-            <p className="mission-label mb-2">Debrief</p>
-            <h1 className="font-orbitron text-3xl font-black text-[#FF6B1A] uppercase">
-              Mission Complete
-            </h1>
-            <p className="text-[#8B97C8] mt-2 text-sm">Check the main screen for results.</p>
-          </div>
-          <Button onClick={() => navigate('/')} variant="outline">
-            Return to Base
+        <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-10 max-w-sm mx-auto text-center space-y-4">
+          <div className="text-5xl">🏁</div>
+          <h1 className="font-display font-extrabold text-3xl text-[#FFF8F0]">That's a wrap!</h1>
+          <p className="text-[#9AA3D0] text-sm">Check the big screen for the final standings.</p>
+          <Button variant="ghost" className="w-full" onClick={() => navigate('/')}>
+            Back home
           </Button>
         </div>
       </GameLayout>
@@ -140,18 +149,13 @@ const PlayerGameContent: React.FC<{
   if (gameStatus !== 'playing' || !currentRound) {
     return (
       <GameLayout>
-        <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-10 max-w-sm mx-auto text-center space-y-6">
-          <Loader2 className="w-10 h-10 text-[#FF6B1A] mx-auto animate-spin" />
-          <div>
-            <p className="mission-label mb-2">Standby</p>
-            <h1 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase">
-              Awaiting Host
-            </h1>
-            <p className="font-space-mono text-xs text-[#8B97C8] mt-3">// Get ready, operative</p>
-          </div>
+        <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-10 max-w-sm mx-auto text-center space-y-4">
+          <Loader2 className="w-10 h-10 text-[#FF8552] mx-auto animate-spin" />
+          <h1 className="font-display font-extrabold text-2xl text-[#FFF8F0]">Get ready, {playerName}</h1>
+          <p className="text-[#9AA3D0] text-sm">Waiting for the host to start…</p>
           <button
             onClick={() => navigate('/join')}
-            className="font-space-mono text-xs text-[#8B97C8] hover:text-[#F5F0E8] transition-colors"
+            className="font-body text-sm text-[#6E77A8] hover:text-[#FFF8F0] transition-colors"
           >
             ← Wrong code? Go back
           </button>
@@ -160,174 +164,165 @@ const PlayerGameContent: React.FC<{
     )
   }
 
-  // Standings
-  const sortedScores = scoresMap
-    ? [...scoresMap.entries()].sort((a, b) => b[1] - a[1])
-    : []
-  const myScore = scoresMap?.get(playerId) ?? 0
-  const myPosition = sortedScores.findIndex(([id]) => id === playerId) + 1
-  const playerCount = sortedScores.length
-  const leaderScore = sortedScores[0]?.[1] ?? 0
-  const secondScore = sortedScores[1]?.[1] ?? 0
-  const isLeader = myPosition === 1
-  const gap = isLeader ? myScore - secondScore : leaderScore - myScore
-  const showStandings = playerCount > 1
+  // Result (3f)
+  if (roundResult) {
+    const correct = roundResult.correct
+    const ringColor = correct ? '#57E6D2' : '#FF6A6A'
+    return (
+      <GameLayout>
+        <div className="relative max-w-sm mx-auto flex flex-col items-center text-center pt-6">
+          {/* Confetti squares (correct only) */}
+          {correct &&
+            [
+              { x: -120, c: '#FFC94D' },
+              { x: 120, c: '#FF8552' },
+              { x: -150, c: '#FF8552' },
+              { x: 150, c: '#57E6D2' },
+              { x: -60, c: '#57E6D2' },
+              { x: 70, c: '#FFC94D' },
+            ].map((s, i) => (
+              <motion.div
+                key={i}
+                initial={{ y: -40, opacity: 0, rotate: 0 }}
+                animate={{ y: 40 + (i % 3) * 30, opacity: [0, 1, 1], rotate: 180 }}
+                transition={{ duration: 1.2, delay: i * 0.06 }}
+                className="absolute top-0 w-3 h-3 rounded-[3px]"
+                style={{ left: `calc(50% + ${s.x}px)`, backgroundColor: s.c }}
+              />
+            ))}
 
-  return (
-    <GameLayout>
-      <div className="flex flex-col items-center gap-8 w-full max-w-sm mx-auto">
-        {/* Player + round info */}
-        <div className="text-center space-y-1">
-          <p className="text-2xl">{playerEmoji}</p>
-          <p className="font-orbitron text-sm font-bold text-[#F5F0E8] uppercase tracking-widest">
-            {playerName}
-          </p>
-          <p className="mission-label">Round {currentRoundIndex + 1}</p>
-        </div>
-
-        {/* Score HUD */}
-        <div className="w-full corner-bracket bg-[#111840] border border-[#2A3468] px-4 py-3 flex items-center justify-between gap-4">
-          <div className="text-center">
-            <p className="mission-label text-[10px]">Score</p>
-            <p className="font-space-mono font-bold text-xl text-[#FFB830]">{myScore}</p>
+          <div
+            className="w-28 h-28 rounded-full flex items-center justify-center text-5xl mb-6"
+            style={{ border: `4px solid ${ringColor}` }}
+          >
+            {playerEmoji}
           </div>
 
-          {showStandings && (
-            <>
-              <div className="h-8 w-px bg-[#2A3468]" />
-              <div className="text-center">
-                <p className="mission-label text-[10px]">Position</p>
-                <p className="font-space-mono font-bold text-xl text-[#F5F0E8]">
-                  #{myPosition}
-                  <span className="text-[#8B97C8] text-sm font-normal"> / {playerCount}</span>
-                </p>
-              </div>
-              <div className="h-8 w-px bg-[#2A3468]" />
-              <div className="text-center min-w-0">
-                <p className="mission-label text-[10px]">{isLeader ? 'Ahead' : 'Behind'}</p>
-                <p className={`font-space-mono font-bold text-xl ${isLeader ? 'text-[#00FFE5]' : 'text-[#FF3D1A]'}`}>
-                  {isLeader ? '+' : '-'}{gap}
-                  <span className="text-[#8B97C8] text-xs font-normal"> pts</span>
-                </p>
-              </div>
-            </>
+          <h1 className="font-display font-extrabold text-[38px] leading-none" style={{ color: ringColor }}>
+            {correct ? 'Nailed it!' : 'Fooled!'}
+          </h1>
+          <p className="text-[#9AA3D0] mt-3">
+            {correct
+              ? `${roundResult.correctChoice} was the real photo`
+              : 'That one was AI-made'}
+          </p>
+
+          {correct && roundResult.points > 0 && (
+            <div className="mt-5 rounded-[16px] border-2 border-[#FFC94D]/50 bg-[#FFC94D]/10 px-6 py-2.5">
+              <span className="font-display font-extrabold text-2xl text-[#FFC94D]">
+                +{roundResult.points} pts
+              </span>
+            </div>
           )}
+
+          {correct && streak >= 2 && (
+            <div className="mt-4 rounded-full bg-white/5 px-4 py-2">
+              <span className="font-body font-semibold text-sm text-[#FFF8F0]">
+                🔥 {streak} in a row — keep it up
+              </span>
+            </div>
+          )}
+
+          <p className="font-body text-sm text-[#6E77A8] mt-8 animate-pulse">
+            Waiting for the next round…
+          </p>
         </div>
+      </GameLayout>
+    )
+  }
+
+  const Header = (
+    <div className="flex items-center justify-between w-full">
+      <div className="flex items-center gap-3">
+        <span className="text-2xl leading-none">{playerEmoji}</span>
+        <div className="text-left">
+          <p className="font-display font-bold text-[#FFF8F0] leading-tight">{playerName}</p>
+          <p className="font-body text-xs text-[#9AA3D0]">
+            Round {currentRoundIndex + 1} of {totalRounds}
+          </p>
+        </div>
+      </div>
+      <span className="rounded-full bg-[#FFC94D]/15 px-3 py-1.5 font-display font-bold text-sm text-[#FFC94D]">
+        ⭐ {myScore}
+      </span>
+    </div>
+  )
+
+  // Voting (2a) / locked-in
+  return (
+    <GameLayout>
+      <div className="max-w-sm mx-auto flex flex-col items-center gap-6">
+        {Header}
 
         <AnimatePresence mode="wait">
-          {roundResult ? (
-            // Result
-            <motion.div
-              key="result"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              className="w-full"
-            >
-              <div
-                className={`corner-bracket border-2 p-10 text-center space-y-5 ${
-                  !roundResult.didVote
-                    ? 'bg-[#FFB830]/10 border-[#FFB830]'
-                    : roundResult.correct
-                      ? 'bg-[#00FFE5]/10 border-[#00FFE5]'
-                      : 'bg-[#FF3D1A]/10 border-[#FF3D1A]'
-                }`}
-              >
-                <div className="text-6xl">
-                  {!roundResult.didVote ? '⏰' : roundResult.correct ? '✅' : '❌'}
-                </div>
-                <div>
-                  <h2
-                    className={`font-orbitron text-3xl font-black uppercase ${
-                      !roundResult.didVote
-                        ? 'text-[#FFB830]'
-                        : roundResult.correct
-                          ? 'text-[#00FFE5]'
-                          : 'text-[#FF3D1A]'
-                    }`}
-                  >
-                    {!roundResult.didVote ? 'Too Slow' : roundResult.correct ? 'Correct' : 'Wrong'}
-                  </h2>
-                  <p className="text-[#8B97C8] mt-2 text-sm">
-                    Option{' '}
-                    <span className="font-bold text-[#F5F0E8]">{roundResult.correctChoice}</span> was
-                    the real photo
-                  </p>
-                </div>
-                {roundResult.correct && (
-                  <div className="border border-[#FFB830]/50 bg-[#FFB830]/10 px-6 py-2 inline-block">
-                    <span className="font-space-mono font-bold text-2xl text-[#FFB830]">
-                      +{roundResult.points} PTS
-                    </span>
-                  </div>
-                )}
-                <p className="font-space-mono text-xs text-[#8B97C8] animate-pulse">
-                  // Awaiting next round...
-                </p>
-              </div>
-            </motion.div>
-          ) : !hasVoted ? (
-            // Vote buttons
+          {!hasVoted ? (
             <motion.div
               key="vote"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="w-full space-y-4"
+              className="w-full flex flex-col items-center gap-5"
             >
+              <CountdownRing value={timeRemaining} total={timeLimit} size={120} showCaption />
+
               <div className="text-center">
-                <p className="mission-label mb-1">Time Remaining</p>
-                <span
-                  className={`font-space-mono text-5xl font-bold ${
-                    timeRemaining <= 5 ? 'text-[#FF3D1A] animate-pulse' : 'text-[#FF6B1A]'
-                  }`}
-                >
-                  {timeRemaining}
-                </span>
+                <h2 className="font-display font-extrabold text-2xl text-[#FFF8F0]">Which one's real?</h2>
+                <p className="text-[#9AA3D0] text-sm mt-1">
+                  Look at the big screen — faster answers score more
+                </p>
               </div>
 
-              <p className="font-orbitron text-lg font-bold text-[#F5F0E8] text-center uppercase tracking-widest">
-                Which is Real?
-              </p>
-
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
+              <button
                 onClick={() => handleVote('A')}
-                className="w-full h-28 bg-[#FF6B1A] text-[#0B0F2E] font-orbitron text-5xl font-black hover:bg-[#FF8C42] hover:shadow-[0_0_30px_rgba(255,107,26,0.5)] transition-all"
+                className="w-full h-[104px] rounded-[18px] bg-[#FF8552] text-[#151936] font-display font-extrabold text-5xl -rotate-1 shadow-[0_6px_0_#C25327] active:translate-y-[3px] active:shadow-[0_3px_0_#C25327] transition-all"
               >
                 A
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
+              </button>
+              <button
                 onClick={() => handleVote('B')}
-                className="w-full h-28 bg-[#1A2355] border-2 border-[#FF6B1A] text-[#FF6B1A] font-orbitron text-5xl font-black hover:bg-[#FF6B1A]/20 hover:shadow-[0_0_30px_rgba(255,107,26,0.3)] transition-all"
+                className="w-full h-[104px] rounded-[18px] bg-[#57E6D2] text-[#151936] font-display font-extrabold text-5xl rotate-1 shadow-[0_6px_0_#2FA391] active:translate-y-[3px] active:shadow-[0_3px_0_#2FA391] transition-all"
               >
                 B
-              </motion.button>
+              </button>
+
+              {/* Speed bonus bar */}
+              <div className="w-full">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-body text-sm text-[#9AA3D0]">Speed bonus</span>
+                  <span className="font-display font-bold text-sm text-[#FFC94D]">
+                    +{potentialPoints} pts if you tap now
+                  </span>
+                </div>
+                <div className="h-2.5 w-full rounded-full bg-white/5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-[width] duration-200 ease-linear"
+                    style={{
+                      width: `${timeFraction * 100}%`,
+                      background: 'linear-gradient(90deg, #FFC94D, #FF8552)',
+                    }}
+                  />
+                </div>
+              </div>
             </motion.div>
           ) : (
-            // Waiting for reveal
             <motion.div
-              key="waiting"
+              key="locked"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
               className="w-full"
             >
-              <div className="corner-bracket bg-[#111840] border border-[#FF6B1A] p-10 text-center space-y-5">
-                <div className="font-orbitron text-7xl font-black text-[#FF6B1A] text-glow-orange">
+              <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-10 text-center space-y-4">
+                <div
+                  className={`font-display font-extrabold text-7xl ${
+                    voteChoice === 'A' ? 'text-[#FF8552]' : 'text-[#57E6D2]'
+                  }`}
+                >
                   {voteChoice}
                 </div>
-                <div>
-                  <h2 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase">
-                    Vote Locked
-                  </h2>
-                  <p className="text-[#8B97C8] text-sm mt-1">You chose Option {voteChoice}</p>
-                </div>
-                <p className="font-space-mono text-xs text-[#00FFE5] animate-pulse">
-                  // Awaiting results...
+                <h2 className="font-display font-extrabold text-2xl text-[#FFF8F0]">Locked in!</h2>
+                <p className="font-body text-sm text-[#9AA3D0]">
+                  You picked {voteChoice}. Watch the big screen…
                 </p>
               </div>
             </motion.div>

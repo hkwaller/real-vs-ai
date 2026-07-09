@@ -1,123 +1,153 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import GameLayout from '@/components/GameLayout'
-import { Loader2, Smile } from 'lucide-react'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { Loader2 } from 'lucide-react'
 
 const EMOJIS = [
-  '😀', '😎', '🤖', '👻', '👽', '👾', '🐱', '🐶', '🦊', '🦁', '🦄', '🐲',
-  '😇', '🤩', '🥳', '🤯', '🤠', '🤡', '😈', '👹', '👺', '🙈', '🙉', '🙊',
-  '🐼', '🐻', '🐨', '🐯', '🐷', '🐸', '🐒', '🦍', '🐔', '🐧', '🐦', '🦉',
-  '🦋', '🐢', '🐍', '🐙', '🦀', '🐠', '🐳', '🐬', '🦖', '🐉', '🧚', '🧜',
-  '🧙', '🧛', '🧟', '🧞', '🧑‍🚀', '🧑‍🎤', '🧑‍🎨', '🧑‍💻', '🧑‍🔬', '🧑‍🎓',
-  '🧑‍🏫', '🧑‍⚖️', '🧑‍🌾', '🧑‍🍳', '🧑‍🔧', '🧑‍🏭', '🧑‍💼', '🧑‍✈️', '🧑‍🚒',
-  '👮', '🕵️', '💂', '👷', '🤴', '👸', '🤵', '👰', '👼', '🎅', '🦸', '🦹',
-  '🧝', '🧟‍♀️', '🧞‍♂️', '🧜‍♀️', '🧚‍♂️',
+  '🦊', '😎', '👾', '💀', '🥱', '🦄',
+  '👽', '🐼', '🐸', '🦖', '🐙', '🤖',
+  '😀', '👻', '🐱', '🐶', '🦁', '🐲',
+  '😇', '🤩', '🥳', '🤯', '🤠', '🤡',
+  '😈', '👹', '👺', '🙈', '🐻', '🐨',
+  '🐯', '🐷', '🐔', '🐧', '🦉', '🦋',
+  '🐢', '🐍', '🐳', '🐬', '🐉', '🧚',
 ]
+
+const CODE_LEN = 4
 
 const JoinGame: React.FC = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
-  const [code, setCode] = useState(searchParams.get('code') || '')
+  const initialCode = (searchParams.get('code') || '').toUpperCase().slice(0, CODE_LEN)
+  const [cells, setCells] = useState<string[]>(() => {
+    const arr = Array(CODE_LEN).fill('')
+    for (let i = 0; i < initialCode.length; i++) arr[i] = initialCode[i]
+    return arr
+  })
   const [name, setName] = useState('')
   const [selectedEmoji, setSelectedEmoji] = useState<string | undefined>(undefined)
+  const [showAllFaces, setShowAllFaces] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const handleJoin = () => {
-    if (!code || !name) return
-    setLoading(true)
+  const inputsRef = useRef<(HTMLInputElement | null)[]>([])
 
-    const upperCode = code.toUpperCase()
+  useEffect(() => {
+    if (!initialCode) inputsRef.current[0]?.focus()
+  }, [initialCode])
+
+  const code = cells.join('')
+  const valid = code.length === CODE_LEN && name.trim().length > 0
+
+  const handleCell = (index: number, raw: string) => {
+    const char = raw.slice(-1).toUpperCase().replace(/[^A-Z0-9]/g, '')
+    setCells((prev) => {
+      const next = [...prev]
+      next[index] = char
+      return next
+    })
+    if (char && index < CODE_LEN - 1) inputsRef.current[index + 1]?.focus()
+  }
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !cells[index] && index > 0) {
+      inputsRef.current[index - 1]?.focus()
+    }
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault()
+    const text = e.clipboardData.getData('text').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LEN)
+    if (!text) return
+    const arr = Array(CODE_LEN).fill('')
+    for (let i = 0; i < text.length; i++) arr[i] = text[i]
+    setCells(arr)
+    inputsRef.current[Math.min(text.length, CODE_LEN - 1)]?.focus()
+  }
+
+  const handleJoin = () => {
+    if (!valid) return
+    setLoading(true)
     const resolvedEmoji = selectedEmoji ?? EMOJIS[Math.floor(Math.random() * EMOJIS.length)]
     const playerId = crypto.randomUUID()
-
-    localStorage.setItem(`rvai_player_${playerId}`, JSON.stringify({ name, emoji: resolvedEmoji }))
-    navigate(`/play/${upperCode}?pid=${playerId}`)
+    localStorage.setItem(`rvai_player_${playerId}`, JSON.stringify({ name: name.trim(), emoji: resolvedEmoji }))
+    navigate(`/play/${code}?pid=${playerId}`)
   }
+
+  const visibleFaces = showAllFaces ? EMOJIS : EMOJIS.slice(0, 11)
 
   return (
     <GameLayout>
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md mx-auto"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-[390px] mx-auto"
       >
-        <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-8 space-y-8">
-          <div>
-            <p className="mission-label mb-2">Enlist</p>
-            <h1 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase tracking-wide">
-              Join Mission
-            </h1>
-            <p className="text-[#8B97C8] text-sm mt-1">Enter your details to deploy</p>
-          </div>
-
-          <div className="space-y-5">
-            {/* Game code */}
-            <div className="space-y-2">
-              <label className="mission-label">Mission Code</label>
-              <Input
-                placeholder="ABCD"
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                maxLength={4}
-                className="text-center text-3xl tracking-[0.4em] uppercase font-space-mono bg-[#0B0F2E] border-[#2A3468] text-[#FF6B1A] focus:border-[#FF6B1A] focus:ring-[#FF6B1A]/20 h-14 placeholder:text-[#2A3468]"
-              />
-            </div>
-
-            {/* Name */}
-            <div className="space-y-2">
-              <label className="mission-label">Operative Name</label>
-              <Input
-                placeholder="Enter your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={12}
-                className="bg-[#0B0F2E] border-[#2A3468] text-[#F5F0E8] focus:border-[#FF6B1A] focus:ring-[#FF6B1A]/20 h-12"
-              />
-            </div>
-
-            {/* Emoji picker */}
-            <div className="space-y-2">
-              <label className="mission-label flex items-center gap-2">
-                <Smile className="w-3 h-3" />
-                Choose Avatar
-              </label>
-              <ScrollArea className="h-[180px] border border-[#2A3468] bg-[#0B0F2E] p-2">
-                <div className="grid grid-cols-6 gap-1">
-                  {EMOJIS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => setSelectedEmoji(emoji)}
-                      className={`text-xl p-2 transition-all ${
-                        selectedEmoji === emoji
-                          ? 'bg-[#FF6B1A]/20 outline outline-2 outline-[#FF6B1A] scale-110'
-                          : 'hover:bg-[#1A2355]'
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-          </div>
-
-          <Button
-            size="lg"
-            className="w-full"
-            onClick={handleJoin}
-            disabled={loading || !code || !name}
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
-            {loading ? 'Deploying...' : 'Join Mission'}
-          </Button>
+        <div className="text-center mb-6">
+          <h1 className="font-display font-extrabold text-3xl text-[#FFF8F0]">Join the party</h1>
+          <p className="text-[#9AA3D0] mt-1">Grab the code from the big screen</p>
         </div>
+
+        {/* Party code */}
+        <label className="font-body font-semibold text-sm text-[#9AA3D0]">Party code</label>
+        <div className="grid grid-cols-4 gap-3 mt-2">
+          {cells.map((c, i) => (
+            <input
+              key={i}
+              ref={(el) => {
+                inputsRef.current[i] = el
+              }}
+              value={c}
+              onChange={(e) => handleCell(i, e.target.value)}
+              onKeyDown={(e) => handleKeyDown(i, e)}
+              onPaste={handlePaste}
+              inputMode="text"
+              maxLength={1}
+              className={`h-16 rounded-[16px] bg-white/5 border-2 text-center font-display font-extrabold text-3xl text-[#FFF8F0] uppercase outline-none transition-colors ${
+                c ? 'border-[#FF8552]' : 'border-white/10'
+              } focus:border-[#FF8552]`}
+            />
+          ))}
+        </div>
+
+        {/* Name */}
+        <label className="font-body font-semibold text-sm text-[#9AA3D0] block mt-6 mb-2">Your name</label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={12} placeholder="Maya" />
+
+        {/* Face picker */}
+        <label className="font-body font-semibold text-sm text-[#9AA3D0] block mt-6 mb-2">Pick your face</label>
+        <div className="grid grid-cols-6 gap-2">
+          {visibleFaces.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => setSelectedEmoji(emoji)}
+              className={`aspect-square rounded-[14px] flex items-center justify-center text-2xl transition-all ${
+                selectedEmoji === emoji
+                  ? 'bg-[#FF8552]/20 border-2 border-[#FF8552] scale-[1.08]'
+                  : 'bg-white/5 border-2 border-transparent hover:bg-white/10'
+              }`}
+            >
+              {emoji}
+            </button>
+          ))}
+          {!showAllFaces && (
+            <button
+              type="button"
+              onClick={() => setShowAllFaces(true)}
+              className="aspect-square rounded-[14px] bg-white/5 hover:bg-white/10 flex items-center justify-center font-body font-semibold text-xs text-[#9AA3D0] transition-colors"
+            >
+              more
+            </button>
+          )}
+        </div>
+
+        <Button size="lg" className="w-full mt-8" onClick={handleJoin} disabled={loading || !valid}>
+          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Let's go! 🚀"}
+        </Button>
       </motion.div>
     </GameLayout>
   )

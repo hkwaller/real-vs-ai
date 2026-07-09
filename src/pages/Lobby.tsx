@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import GameLayout from '@/components/GameLayout';
-import { Users, Play, Check, Copy, Rocket } from 'lucide-react';
+import { Check, Copy, Link2 } from 'lucide-react';
 import {
   RoomProvider,
   useOthers,
@@ -24,7 +24,7 @@ interface GameSettings {
 
 const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code, settings }) => {
   const navigate = useNavigate();
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'code' | 'link' | null>(null);
 
   const others = useOthers();
   const players = others
@@ -39,15 +39,12 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
   const storageLoaded = useStorage((root) => root.gameStatus) !== null;
   const isReady = status === 'connected' && storageLoaded;
 
-  const writeSettings = useMutation(
-    ({ storage }, s: GameSettings) => {
-      const settingsObj = storage.get('settings');
-      settingsObj.set('rounds', s.rounds);
-      settingsObj.set('timeLimit', s.timeLimit);
-      settingsObj.set('revealMode', s.revealMode);
-    },
-    [],
-  );
+  const writeSettings = useMutation(({ storage }, s: GameSettings) => {
+    const settingsObj = storage.get('settings');
+    settingsObj.set('rounds', s.rounds);
+    settingsObj.set('timeLimit', s.timeLimit);
+    settingsObj.set('revealMode', s.revealMode);
+  }, []);
 
   useEffect(() => {
     if (!isReady) return;
@@ -58,10 +55,12 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
     storage.get('gameStatus').set('value', 'playing');
   }, []);
 
-  const copyCode = () => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const joinUrl = `${window.location.origin}/join?code=${code}`;
+
+  const copy = (what: 'code' | 'link') => {
+    navigator.clipboard.writeText(what === 'code' ? code : joinUrl);
+    setCopied(what);
+    setTimeout(() => setCopied(null), 2000);
   };
 
   const handleStart = () => {
@@ -70,133 +69,91 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
     navigate(`/game/${code}`);
   };
 
-  const joinUrl = `${window.location.origin}/join?code=${code}`;
+  const settingsSummary = `${settings.rounds} rounds · ${settings.timeLimit}s each · ${
+    settings.revealMode === 'instant' ? 'live votes' : 'votes at the end'
+  }`;
 
   return (
-    <GameLayout>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+    <GameLayout className="max-w-6xl">
+      <div className="grid grid-cols-1 md:grid-cols-[0.9fr_1.1fr] gap-6 w-full">
         {/* Left: Code + QR */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-8 flex flex-col items-center gap-8">
-            <div className="text-center">
-              <p className="mission-label mb-3">Mission Code</p>
-              <div
-                className="font-space-mono text-7xl font-bold text-[#FF6B1A] tracking-[0.15em] cursor-pointer hover:text-[#FF8C42] transition-colors text-glow-orange"
-                onClick={copyCode}
-              >
-                {code}
-              </div>
-              <button
-                onClick={copyCode}
-                className="mt-3 flex items-center gap-2 mx-auto font-orbitron text-xs text-[#8B97C8] hover:text-[#F5F0E8] transition-colors uppercase tracking-widest"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-3 h-3 text-[#00FFE5]" />
-                    <span className="text-[#00FFE5]">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3 h-3" />
-                    Copy Code
-                  </>
-                )}
-              </button>
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+          <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-8 flex flex-col items-center gap-6 h-full">
+            <p className="text-[#9AA3D0] text-center">
+              Join at <span className="font-display font-bold text-[#FFF8F0]">{window.location.host}</span> with code
+            </p>
+            <div className="font-display font-extrabold text-[88px] leading-none tracking-wide text-[#FF8552]">
+              {code}
             </div>
 
-            <div className="p-3 bg-white border-4 border-[#FF6B1A]">
+            <div className="bg-white rounded-[20px] p-4">
               <QRCodeSVG value={joinUrl} size={160} />
             </div>
 
-            <p className="font-space-mono text-xs text-[#8B97C8]">// Scan to join mission</p>
-
-            {/* Settings summary */}
-            <div className="w-full border-t border-[#2A3468] pt-6 space-y-2">
-              <p className="mission-label mb-3">Mission Parameters</p>
-              {[
-                ['Rounds', settings.rounds],
-                ['Time Limit', `${settings.timeLimit}s`],
-                ['Reveal Mode', settings.revealMode === 'instant' ? 'Instant' : 'After Round'],
-              ].map(([label, value]) => (
-                <div key={String(label)} className="flex justify-between items-center">
-                  <span className="font-space-mono text-xs text-[#8B97C8]">{label}</span>
-                  <span className="font-space-mono text-xs text-[#FF6B1A] font-bold">{value}</span>
-                </div>
-              ))}
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" onClick={() => copy('code')}>
+                {copied === 'code' ? <Check className="w-4 h-4 text-[#57E6D2]" /> : <Copy className="w-4 h-4" />}
+                Copy code
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => copy('link')}>
+                {copied === 'link' ? <Check className="w-4 h-4 text-[#57E6D2]" /> : <Link2 className="w-4 h-4" />}
+                Copy link
+              </Button>
             </div>
+
+            <p className="font-body text-sm text-[#6E77A8] mt-auto">{settingsSummary}</p>
           </div>
         </motion.div>
 
         {/* Right: Player list */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="flex flex-col"
-        >
-          <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-6 flex flex-col flex-1">
+        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex flex-col">
+          <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-8 flex flex-col flex-1">
             <div className="flex items-center justify-between mb-6">
-              <div>
-                <p className="mission-label mb-1">Roster</p>
-                <h2 className="font-orbitron text-xl font-bold text-[#F5F0E8] uppercase tracking-wide">
-                  Active Operatives
-                </h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-[#8B97C8]" />
-                <span className="font-space-mono text-lg font-bold text-[#00FFE5]">
-                  {players.length}
+              <h2 className="font-display font-extrabold text-3xl text-[#FFF8F0]">Who's in</h2>
+              <span className="flex items-center gap-2 rounded-full bg-[#57E6D2]/15 px-3 py-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#57E6D2] animate-pulse" />
+                <span className="font-body font-semibold text-sm text-[#57E6D2]">
+                  {players.length} {players.length === 1 ? 'player' : 'players'}
                 </span>
-              </div>
+              </span>
             </div>
 
-            <div className="flex-1 min-h-[240px] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-2">
+            <div className="flex-1 min-h-[240px]">
+              <div className="grid grid-cols-2 gap-3">
                 <AnimatePresence>
                   {players.map((player) => (
                     <motion.div
                       key={player.id}
-                      initial={{ opacity: 0, scale: 0.8 }}
+                      initial={{ opacity: 0, scale: 0.5 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      className="bg-[#1A2355] border border-[#2A3468] p-3 flex items-center gap-3"
+                      exit={{ opacity: 0, scale: 0.5 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+                      className="rounded-[16px] bg-white/5 px-4 py-3 flex items-center gap-3"
                     >
-                      <span className="text-2xl">{player.emoji}</span>
-                      <span className="font-space-mono text-sm text-[#F5F0E8] truncate">
+                      <span className="text-[30px] leading-none">{player.emoji}</span>
+                      <span className="font-display font-bold text-[17px] text-[#FFF8F0] truncate">
                         {player.name}
                       </span>
                     </motion.div>
                   ))}
                 </AnimatePresence>
-                {players.length === 0 && (
-                  <div className="col-span-2 flex flex-col items-center justify-center py-12 gap-3">
-                    <div className="w-2 h-2 rounded-full bg-[#2A3468] animate-pulse" />
-                    <p className="font-space-mono text-xs text-[#8B97C8]">
-                      // Awaiting operatives...
-                    </p>
-                  </div>
-                )}
+                <div className="rounded-[16px] border border-dashed border-white/15 px-4 py-3 flex items-center text-[#6E77A8]">
+                  <span className="font-body text-sm">Waiting for more…</span>
+                </div>
               </div>
             </div>
 
-            <div className="mt-6 pt-6 border-t border-[#2A3468]">
-              <Button
-                size="xl"
-                className="w-full"
-                onClick={handleStart}
-                disabled={players.length === 0 || !isReady}
-              >
-                <Rocket className="mr-2 h-5 w-5" />
-                Launch Mission
-              </Button>
-              {!isReady && (
-                <p className="font-space-mono text-xs text-[#8B97C8] text-center mt-3">
-                  // Connecting to server...
-                </p>
-              )}
-            </div>
+            <Button
+              size="xl"
+              className="w-full mt-6"
+              onClick={handleStart}
+              disabled={players.length === 0 || !isReady}
+            >
+              Start the game ▶
+            </Button>
+            {!isReady && (
+              <p className="font-body text-sm text-[#6E77A8] text-center mt-3">Connecting…</p>
+            )}
           </div>
         </motion.div>
       </div>

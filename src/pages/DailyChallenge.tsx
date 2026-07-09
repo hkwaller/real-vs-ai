@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import GameLayout from '@/components/GameLayout'
-import { Loader2, Trophy, Calendar, Share2, ArrowRight, Home, ZoomIn, X } from 'lucide-react'
+import { Loader2, ZoomIn, X } from 'lucide-react'
 import {
   getTodayDate,
   fetchSchedule,
@@ -25,6 +25,27 @@ type RoundResult = {
   points: number
 }
 
+// Consecutive completed days ending today (or yesterday if today isn't done).
+function computeStreak(): number {
+  const scores = getDailyScores()
+  let streak = 0
+  const d = new Date()
+  if (!scores[getTodayDate()]) d.setDate(d.getDate() - 1)
+  for (;;) {
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    if (!scores[key]) break
+    streak++
+    d.setDate(d.getDate() - 1)
+  }
+  return streak
+}
+
+function prettyDate(date: string): string {
+  const d = new Date(date + 'T00:00:00')
+  if (isNaN(d.getTime())) return date
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+}
+
 const DailyChallenge: React.FC = () => {
   const { date: dateParam } = useParams<{ date?: string }>()
   const navigate = useNavigate()
@@ -40,12 +61,11 @@ const DailyChallenge: React.FC = () => {
   const [roundDetails, setRoundDetails] = useState<RoundDetail[]>([])
   const [existingScore, setExistingScore] = useState<DailyScore | null>(null)
   const [countdown, setCountdown] = useState('')
-
   const [zoomedImage, setZoomedImage] = useState<string | null>(null)
+  const [showReview, setShowReview] = useState(false)
 
   const currentRound = rounds[roundIndex] ?? null
 
-  // Load schedule on mount
   useEffect(() => {
     async function load() {
       const scores = getDailyScores()
@@ -54,36 +74,30 @@ const DailyChallenge: React.FC = () => {
         setPhase('already_done')
         return
       }
-
       const schedule = await fetchSchedule()
       if (!schedule || !schedule[date]) {
         setPhase('no_challenge')
         return
       }
-
-      const builtRounds = buildRounds(date, schedule[date].images)
-      setRounds(builtRounds)
+      setRounds(buildRounds(date, schedule[date].images))
       setPhase('playing')
     }
     load()
   }, [date])
 
-  // Countdown to midnight (for "already done" screen)
   useEffect(() => {
-    if (phase !== 'already_done' || !isToday) return
+    if ((phase !== 'already_done' && phase !== 'finished') || !isToday) return
     const tick = () => setCountdown(formatCountdown(msUntilMidnight()))
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
   }, [phase, isToday])
 
-  // Reset round state when a new round starts
   useEffect(() => {
     if (phase !== 'playing') return
     setRoundResult(null)
   }, [phase === 'playing' ? currentRound?.id : null, phase])
 
-  // Close lightbox on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setZoomedImage(null)
@@ -94,7 +108,6 @@ const DailyChallenge: React.FC = () => {
 
   const handleVote = (choice: 'A' | 'B') => {
     if (phase !== 'playing' || !currentRound) return
-
     const isRealLeft = currentRound.id.charCodeAt(0) % 2 === 0
     const correctChoice: 'A' | 'B' = isRealLeft ? 'A' : 'B'
     const correct = choice === correctChoice
@@ -121,10 +134,9 @@ const DailyChallenge: React.FC = () => {
   const handleNext = () => {
     const nextIndex = roundIndex + 1
     if (nextIndex >= rounds.length) {
-      const maxScore = rounds.length * 100
       const result: DailyScore = {
         score,
-        maxScore,
+        maxScore: rounds.length * 100,
         rounds: rounds.length,
         completedAt: new Date().toISOString(),
         roundDetails,
@@ -138,343 +150,161 @@ const DailyChallenge: React.FC = () => {
     }
   }
 
-  const existingCorrect = existingScore?.roundDetails?.filter((r) => r.correct).length ?? 0
-  const existingTotal = existingScore?.roundDetails?.length ?? existingScore?.rounds ?? 0
-
-  const shareText = existingScore
-    ? `I got ${existingCorrect}/${existingTotal} correct on the Real vs AI Daily Challenge! Can you beat me? 🤖`
-    : ''
-
   const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({ text: shareText })
-    } else {
-      navigator.clipboard.writeText(shareText)
-    }
+    const details = existingScore?.roundDetails ?? []
+    const correct = details.filter((r) => r.correct).length
+    const grid = details.map((r) => (r.correct ? '🟩' : '🟥')).join('')
+    const text = `Real vs AI — Today's five\n${correct}/${details.length} ${grid}\nCan you beat me? 🤖`
+    if (navigator.share) navigator.share({ text }).catch(() => {})
+    else navigator.clipboard.writeText(text)
   }
 
-  // --- Phases ---
-
+  // --- Loading ---
   if (phase === 'loading') {
     return (
       <GameLayout>
-        <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-10 max-w-sm mx-auto text-center space-y-4">
-          <Loader2 className="w-10 h-10 text-[#FFB830] mx-auto animate-spin" />
-          <div>
-            <p className="mission-label mb-1">Standby</p>
-            <h1 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase">
-              Loading Challenge
-            </h1>
-          </div>
+        <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-10 max-w-sm mx-auto text-center space-y-4">
+          <Loader2 className="w-10 h-10 text-[#57E6D2] mx-auto animate-spin" />
+          <h1 className="font-display font-extrabold text-2xl text-[#FFF8F0]">Loading today's five…</h1>
         </div>
       </GameLayout>
     )
   }
 
+  // --- No challenge ---
   if (phase === 'no_challenge') {
     return (
       <GameLayout>
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center gap-6 text-center max-w-md"
+          className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-10 max-w-md mx-auto text-center space-y-5"
         >
-          <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-10 w-full space-y-5">
-            <Calendar className="w-14 h-14 text-[#FFB830] mx-auto" />
-            <div>
-              <p className="mission-label mb-2">Status</p>
-              <h1 className="font-orbitron text-3xl font-black text-[#FF6B1A] uppercase">
-                No Mission Today
-              </h1>
-              <p className="text-[#8B97C8] mt-2 text-sm">
-                {isToday
-                  ? 'No daily challenge scheduled. Check back tomorrow.'
-                  : `No challenge was scheduled for ${date}.`}
-              </p>
-            </div>
-            <div className="flex gap-3 justify-center">
-              <Button variant="outline" onClick={() => navigate('/')}>
-                <Home className="w-4 h-4 mr-2" />
-                Home
-              </Button>
-              <Button variant="secondary" asChild>
-                <Link to="/daily/archive">Past Challenges</Link>
-              </Button>
-            </div>
+          <div className="text-5xl">🗓️</div>
+          <div>
+            <h1 className="font-display font-extrabold text-3xl text-[#FFF8F0]">No challenge today</h1>
+            <p className="text-[#9AA3D0] mt-2 text-sm">
+              {isToday ? 'Check back tomorrow for a fresh five.' : `Nothing was scheduled for ${date}.`}
+            </p>
+          </div>
+          <div className="flex gap-3 justify-center">
+            <Button variant="ghost" onClick={() => navigate('/')}>Home</Button>
+            <Button variant="secondary" onClick={() => navigate('/daily/archive')}>Past challenges</Button>
           </div>
         </motion.div>
       </GameLayout>
     )
   }
 
-  if (phase === 'already_done' && existingScore) {
+  // --- Results (already done or just finished) — design 3h ---
+  if ((phase === 'already_done' || phase === 'finished') && existingScore) {
     const details = existingScore.roundDetails ?? []
     const correctCount = details.filter((r) => r.correct).length
     const totalRounds = details.length || existingScore.rounds
+    const streak = computeStreak()
+
     return (
       <GameLayout>
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center gap-6 text-center max-w-lg w-full"
-        >
-          <div className="corner-bracket bg-[#111840] border border-[#FFB830]/50 p-8 w-full space-y-5">
-            <Trophy className="w-14 h-14 text-[#FFB830] mx-auto" />
-            <div>
-              <p className="mission-label mb-2">Debrief</p>
-              <h1 className="font-orbitron text-3xl font-black text-[#FF6B1A] uppercase">
-                Already Completed
-              </h1>
-              <p className="text-[#8B97C8] mt-2 text-sm">
-                {isToday
-                  ? "You've already done today's challenge."
-                  : `Completed on ${new Date(existingScore.completedAt).toLocaleDateString()}.`}
-              </p>
-            </div>
-
-            <div className="border border-[#2A3468] bg-[#0B0F2E] p-6 text-center space-y-3">
-              <div className="font-space-mono text-5xl font-bold text-[#FFB830]">
-                {correctCount}
-                <span className="text-2xl text-[#8B97C8] font-normal">/{totalRounds}</span>
-              </div>
-              <p className="mission-label">correct</p>
-              <div className="flex items-center justify-center gap-2 pt-1">
-                {details.map((rd, i) => (
-                  <div
-                    key={i}
-                    className={`w-7 h-7 flex items-center justify-center text-sm font-bold ${
-                      rd.correct
-                        ? 'bg-[#00FFE5]/20 text-[#00FFE5] border border-[#00FFE5]/40'
-                        : 'bg-[#FF3D1A]/20 text-[#FF3D1A] border border-[#FF3D1A]/40'
-                    }`}
-                  >
-                    {rd.correct ? '✓' : '✗'}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Round-by-round recap */}
-            {details.length > 0 && (
-              <div className="space-y-3 text-left">
-                <p className="mission-label text-center">Round Recap</p>
-                {details.map((rd, i) => {
-                  const imgA = rd.isRealLeft ? rd.realImageUrl : rd.aiImageUrl
-                  const imgB = rd.isRealLeft ? rd.aiImageUrl : rd.realImageUrl
-                  const isRealA = rd.isRealLeft
-                  return (
-                    <div
-                      key={rd.roundId}
-                      className="border border-[#2A3468] bg-[#0B0F2E]/60 p-3 space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-space-mono text-xs text-[#8B97C8]">
-                          Round {i + 1}
-                        </span>
-                        <span
-                          className={`font-space-mono text-xs font-bold ${
-                            rd.correct ? 'text-[#00FFE5]' : 'text-[#FF3D1A]'
-                          }`}
-                        >
-                          {rd.correct ? '✓ Correct' : '✗ Wrong'}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(['A', 'B'] as const).map((opt) => {
-                          const imgUrl = opt === 'A' ? imgA : imgB
-                          const isReal = opt === 'A' ? isRealA : !isRealA
-                          const wasChosen = rd.playerChoice === opt
-                          return (
-                            <div
-                              key={opt}
-                              className={`relative overflow-hidden border-2 ${
-                                wasChosen
-                                  ? rd.correct
-                                    ? 'border-[#00FFE5]'
-                                    : 'border-[#FF3D1A]'
-                                  : rd.correctChoice === opt
-                                    ? 'border-[#00FFE5]/40'
-                                    : 'border-[#2A3468]'
-                              }`}
-                            >
-                              <img
-                                src={imgUrl}
-                                alt={`Option ${opt}`}
-                                className="w-full h-full object-cover"
-                              />
-                              <div
-                                className={`absolute inset-0 flex flex-col items-center justify-between p-1.5 ${isReal ? 'bg-[#00FFE5]/5' : 'bg-[#FF3D1A]/5'}`}
-                              >
-                                <span
-                                  className={`font-orbitron text-xs font-black self-start ${wasChosen ? 'text-white' : 'text-white/50'}`}
-                                >
-                                  {opt}
-                                </span>
-                                <div className="flex items-center gap-1">
-                                  {wasChosen && (
-                                    <span
-                                      className={`font-space-mono text-[9px] font-bold px-1.5 py-0.5 ${rd.correct ? 'bg-[#00FFE5]/80 text-[#0B0F2E]' : 'bg-[#FF3D1A]/80 text-white'}`}
-                                    >
-                                      YOUR PICK
-                                    </span>
-                                  )}
-                                  <span
-                                    className={`font-space-mono text-[9px] font-bold px-1.5 py-0.5 ${isReal ? 'bg-[#00FFE5]/70 text-[#0B0F2E]' : 'bg-[#1A2355] text-[#8B97C8]'}`}
-                                  >
-                                    {isReal ? 'REAL' : 'AI'}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {isToday && (
-              <div className="text-center space-y-1">
-                <p className="mission-label">Next Challenge In</p>
-                <p className="font-space-mono text-2xl font-bold text-[#00FFE5]">{countdown}</p>
-              </div>
-            )}
-
-            <div className="flex gap-3 flex-wrap justify-center">
-              <Button variant="outline" onClick={handleShare}>
-                <Share2 className="w-4 h-4 mr-2" />
-                Share Score
-              </Button>
-              <Button variant="secondary" asChild>
-                <Link to="/daily/archive">Past Challenges</Link>
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/')}>
-                <Home className="w-4 h-4 mr-2" />
-                Home
-              </Button>
-            </div>
-          </div>
-        </motion.div>
-      </GameLayout>
-    )
-  }
-
-  if (phase === 'finished' && existingScore) {
-    const details = existingScore.roundDetails ?? []
-    const correctCount = details.filter((r) => r.correct).length
-    const totalRounds = details.length || existingScore.rounds
-    return (
-      <GameLayout>
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center gap-6 text-center max-w-lg w-full"
+          className="max-w-md mx-auto text-center flex flex-col items-center"
         >
-          <div className="corner-bracket bg-[#111840] border border-[#FFB830]/50 p-8 w-full space-y-5">
-            <Trophy className="w-14 h-14 text-[#FFB830] mx-auto" />
-            <div>
-              <p className="mission-label mb-2">Debrief</p>
-              <h1 className="font-orbitron text-3xl font-black text-[#FF6B1A] uppercase">
-                Mission Complete
-              </h1>
-              <p className="text-[#8B97C8] mt-1 font-space-mono text-xs">{date}</p>
-            </div>
+          <div className="text-5xl mb-4">🎯</div>
+          <h1 className="font-display font-extrabold text-4xl text-[#FFF8F0]">
+            {correctCount} out of {totalRounds}!
+          </h1>
+          <p className="text-[#9AA3D0] mt-2">
+            {correctCount === totalRounds
+              ? 'A perfect five. Incredible eye.'
+              : correctCount >= totalRounds / 2
+                ? 'Nice eye — the AI didn’t fool you much today.'
+                : 'The AI got you today. Come back tomorrow!'}
+          </p>
 
-            <div className="border border-[#2A3468] bg-[#0B0F2E] p-6 text-center space-y-3">
-              <div className="font-space-mono text-5xl font-bold text-[#FFB830]">
-                {correctCount}
-                <span className="text-2xl text-[#8B97C8] font-normal">/{totalRounds}</span>
+          {/* Result tiles */}
+          <div className="flex items-center justify-center gap-2.5 mt-6">
+            {details.map((rd, i) => (
+              <div
+                key={i}
+                className={`w-11 h-11 rounded-[12px] flex items-center justify-center font-display font-extrabold text-lg ${
+                  rd.correct
+                    ? 'bg-[#57E6D2]/15 text-[#57E6D2] border border-[#57E6D2]/40'
+                    : 'bg-[#FF6A6A]/15 text-[#FF6A6A] border border-[#FF6A6A]/40'
+                }`}
+              >
+                {rd.correct ? '✓' : '✗'}
               </div>
-              <p className="mission-label">correct</p>
-              <div className="flex items-center justify-center gap-2 pt-1">
-                {details.map((rd, i) => (
-                  <div
-                    key={i}
-                    className={`w-7 h-7 flex items-center justify-center text-sm font-bold ${
-                      rd.correct
-                        ? 'bg-[#00FFE5]/20 text-[#00FFE5] border border-[#00FFE5]/40'
-                        : 'bg-[#FF3D1A]/20 text-[#FF3D1A] border border-[#FF3D1A]/40'
-                    }`}
-                  >
-                    {rd.correct ? '✓' : '✗'}
-                  </div>
-                ))}
-              </div>
-            </div>
+            ))}
+          </div>
 
-            {/* Round-by-round recap */}
-            {details.length > 0 && (
-              <div className="space-y-3 text-left">
-                <p className="mission-label text-center">Round Recap</p>
+          {streak > 0 && (
+            <div className="mt-6 rounded-full bg-[#FFC94D]/12 px-4 py-2">
+              <span className="font-body font-semibold text-sm text-[#FFC94D]">🔥 {streak}-day streak</span>
+            </div>
+          )}
+
+          <div className="w-full mt-8 space-y-3">
+            <Button size="lg" className="w-full" onClick={handleShare}>
+              Challenge a friend 📤
+            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="ghost" onClick={() => setShowReview((v) => !v)}>
+                Review rounds
+              </Button>
+              <Button variant="ghost" onClick={() => navigate('/')}>
+                Home
+              </Button>
+            </div>
+          </div>
+
+          {isToday && (
+            <p className="font-body text-sm text-[#6E77A8] mt-6">
+              Next five in <span className="font-display font-bold text-[#57E6D2]">{countdown}</span>
+            </p>
+          )}
+
+          {/* Review rounds (toggle) */}
+          <AnimatePresence>
+            {showReview && details.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="w-full mt-6 space-y-3 overflow-hidden text-left"
+              >
                 {details.map((rd, i) => {
                   const imgA = rd.isRealLeft ? rd.realImageUrl : rd.aiImageUrl
                   const imgB = rd.isRealLeft ? rd.aiImageUrl : rd.realImageUrl
-                  const isRealA = rd.isRealLeft
                   return (
-                    <div
-                      key={rd.roundId}
-                      className="border border-[#2A3468] bg-[#0B0F2E]/60 p-3 space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-space-mono text-xs text-[#8B97C8]">
-                          Round {i + 1}
-                        </span>
+                    <div key={rd.roundId} className="rounded-[16px] border border-white/[0.07] bg-[#1F2450] p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-body text-sm text-[#9AA3D0]">Round {i + 1}</span>
                         <span
-                          className={`font-space-mono text-xs font-bold ${
-                            rd.correct ? 'text-[#00FFE5]' : 'text-[#FF3D1A]'
-                          }`}
+                          className={`font-body text-sm font-bold ${rd.correct ? 'text-[#57E6D2]' : 'text-[#FF6A6A]'}`}
                         >
                           {rd.correct ? '✓ Correct' : '✗ Wrong'}
                         </span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         {(['A', 'B'] as const).map((opt) => {
-                          const imgUrl = opt === 'A' ? imgA : imgB
-                          const isReal = opt === 'A' ? isRealA : !isRealA
-                          const wasChosen = rd.playerChoice === opt
+                          const url = opt === 'A' ? imgA : imgB
+                          const isReal = opt === rd.correctChoice
                           return (
                             <div
                               key={opt}
-                              className={`relative overflow-hidden border-2 ${
-                                wasChosen
-                                  ? rd.correct
-                                    ? 'border-[#00FFE5]'
-                                    : 'border-[#FF3D1A]'
-                                  : rd.correctChoice === opt
-                                    ? 'border-[#00FFE5]/40'
-                                    : 'border-[#2A3468]'
+                              className={`relative overflow-hidden rounded-[12px] border-2 aspect-[4/3] ${
+                                isReal ? 'border-[#57E6D2]' : 'border-white/10'
                               }`}
                             >
-                              <img
-                                src={imgUrl}
-                                alt={`Option ${opt}`}
-                                className="w-full h-full object-cover"
-                              />
-                              <div
-                                className={`absolute inset-0 flex flex-col items-center justify-between p-1.5 ${isReal ? 'bg-[#00FFE5]/5' : 'bg-[#FF3D1A]/5'}`}
+                              <img src={url} alt={`Option ${opt}`} className="w-full h-full object-cover" />
+                              <span
+                                className={`absolute bottom-1.5 left-1.5 rounded-full px-2 py-0.5 font-display font-bold text-xs ${
+                                  isReal ? 'bg-[#57E6D2] text-[#151936]' : 'bg-[#151936]/80 text-[#9AA3D0]'
+                                }`}
                               >
-                                <span
-                                  className={`font-orbitron text-xs font-black self-start ${wasChosen ? 'text-white' : 'text-white/50'}`}
-                                >
-                                  {opt}
-                                </span>
-                                <div className="flex items-center gap-1">
-                                  {wasChosen && (
-                                    <span
-                                      className={`font-space-mono text-[9px] font-bold px-1.5 py-0.5 ${rd.correct ? 'bg-[#00FFE5]/80 text-[#0B0F2E]' : 'bg-[#FF3D1A]/80 text-white'}`}
-                                    >
-                                      YOUR PICK
-                                    </span>
-                                  )}
-                                  <span
-                                    className={`font-space-mono text-[9px] font-bold px-1.5 py-0.5 ${isReal ? 'bg-[#00FFE5]/70 text-[#0B0F2E]' : 'bg-[#1A2355] text-[#8B97C8]'}`}
-                                  >
-                                    {isReal ? 'REAL' : 'AI'}
-                                  </span>
-                                </div>
-                              </div>
+                                {isReal ? 'REAL' : 'AI'}
+                              </span>
                             </div>
                           )
                         })}
@@ -482,30 +312,9 @@ const DailyChallenge: React.FC = () => {
                     </div>
                   )
                 })}
-              </div>
+              </motion.div>
             )}
-
-            {isToday && (
-              <div className="text-center space-y-1">
-                <p className="mission-label">Next Challenge In</p>
-                <p className="font-space-mono text-2xl font-bold text-[#00FFE5]">{countdown}</p>
-              </div>
-            )}
-
-            <div className="flex gap-3 flex-wrap justify-center">
-              <Button onClick={handleShare}>
-                <Share2 className="w-4 h-4 mr-2" />
-                Share Result
-              </Button>
-              <Button variant="secondary" asChild>
-                <Link to="/daily/archive">Past Challenges</Link>
-              </Button>
-              <Button variant="outline" onClick={() => navigate('/')}>
-                <Home className="w-4 h-4 mr-2" />
-                Home
-              </Button>
-            </div>
-          </div>
+          </AnimatePresence>
         </motion.div>
       </GameLayout>
     )
@@ -516,172 +325,161 @@ const DailyChallenge: React.FC = () => {
   const isRealLeft = currentRound.id.charCodeAt(0) % 2 === 0
   const imageA = isRealLeft ? currentRound.realImageUrl : currentRound.aiImageUrl
   const imageB = isRealLeft ? currentRound.aiImageUrl : currentRound.realImageUrl
+  const streak = computeStreak()
+
+  // progress squares state
+  const squares = rounds.map((_, i) => {
+    if (i < roundDetails.length) return roundDetails[i].correct ? 'correct' : 'wrong'
+    if (i === roundIndex) return 'current'
+    return 'upcoming'
+  })
 
   return (
-    <GameLayout className="max-w-screen p-8">
-      <div className="flex flex-col items-center gap-6 w-full mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="text-center space-y-1">
-          <div className="flex items-center justify-center gap-2 text-[#FFB830] mb-1">
-            <Calendar className="w-4 h-4" />
-            <span className="font-space-mono text-xs font-bold tracking-widest uppercase">
-              {isToday ? "Today's Challenge" : date}
-            </span>
-          </div>
-          <h1 className="font-orbitron text-3xl font-black text-[#F5F0E8] uppercase tracking-tight">
-            Which is Real?
-          </h1>
-          <p className="mission-label">
-            Round {roundIndex + 1} of {rounds.length}
-          </p>
+    <GameLayout className="max-w-5xl">
+      {/* Top strip */}
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <span className="font-body font-semibold text-sm text-[#FFF8F0]">
+          ☀️ Today's five · {prettyDate(date)}
+        </span>
+        <div className="flex items-center gap-2">
+          {squares.map((s, i) => (
+            <div
+              key={i}
+              className={`w-3.5 h-3.5 rounded-[4px] ${
+                s === 'correct'
+                  ? 'bg-[#57E6D2]'
+                  : s === 'wrong'
+                    ? 'bg-[#FF6A6A]'
+                    : s === 'current'
+                      ? 'bg-[#FF8552] ring-4 ring-[#FF8552]/25'
+                      : 'bg-white/10'
+              }`}
+            />
+          ))}
         </div>
-
-        <AnimatePresence mode="wait">
-          {phase === 'reveal' && roundResult ? (
-            <motion.div
-              key="reveal"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              className="w-full flex flex-col items-center gap-4"
-            >
-              {/* Images with answer overlay */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-                {(['A', 'B'] as const).map((option, i) => {
-                  const imgUrl = i === 0 ? imageA : imageB
-                  const isReal = i === 0 ? isRealLeft : !isRealLeft
-                  return (
-                    <div
-                      key={option}
-                      className={`relative overflow-hidden border-2 ${
-                        isReal ? 'border-[#00FFE5]' : 'border-[#FF3D1A]'
-                      }`}
-                    >
-                      <img
-                        src={imgUrl}
-                        alt={`Option ${option}`}
-                        className="w-full h-full object-cover"
-                      />
-                      <div
-                        className={`absolute inset-0 flex items-end justify-center pb-3 ${
-                          isReal ? 'bg-[#00FFE5]/10' : 'bg-[#FF3D1A]/10'
-                        }`}
-                      >
-                        <span
-                          className={`font-space-mono text-xs font-bold px-3 py-1 ${
-                            isReal ? 'bg-[#00FFE5]/80 text-[#0B0F2E]' : 'bg-[#FF3D1A]/80 text-white'
-                          }`}
-                        >
-                          {isReal ? '✓ REAL' : '✗ AI'}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Result card */}
-              <div
-                className={`corner-bracket w-full text-center py-6 px-6 border-2 space-y-3 ${
-                  roundResult.correct
-                    ? 'border-[#00FFE5] bg-[#00FFE5]/10'
-                    : 'border-[#FF3D1A] bg-[#FF3D1A]/10'
-                }`}
-              >
-                <div className="text-5xl">{roundResult.correct ? '✅' : '❌'}</div>
-                <h2
-                  className={`font-orbitron text-2xl font-black uppercase ${
-                    roundResult.correct ? 'text-[#00FFE5]' : 'text-[#FF3D1A]'
-                  }`}
-                >
-                  {roundResult.correct ? 'Correct' : 'Wrong'}
-                </h2>
-              </div>
-
-              <Button size="lg" className="w-full" onClick={handleNext}>
-                {roundIndex + 1 < rounds.length ? (
-                  <>
-                    Next Round
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </>
-                ) : (
-                  <>
-                    See Results
-                    <Trophy className="w-4 h-4 ml-2" />
-                  </>
-                )}
-              </Button>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="playing"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="w-full flex flex-col items-center gap-4"
-            >
-              {/* Images — click to zoom */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-                {(['A', 'B'] as const).map((option, i) => {
-                  const imgUrl = i === 0 ? imageA : imageB
-                  return (
-                    <motion.div
-                      key={option}
-                      whileHover={{ scale: 1.02 }}
-                      className="relative overflow-hidden border-2 border-[#2A3468] hover:border-[#FFB830] hover:shadow-[0_0_20px_rgba(255,184,48,0.25)] transition-all cursor-zoom-in group"
-                      onClick={() => setZoomedImage(imgUrl)}
-                    >
-                      <img
-                        src={imgUrl}
-                        alt={`Option ${option}`}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute top-2 left-2 bg-[#0B0F2E]/80 px-2 py-1 border border-[#2A3468]">
-                        <span className="font-orbitron text-sm font-black text-[#FF6B1A]">
-                          {option}
-                        </span>
-                      </div>
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-[#0B0F2E]/30">
-                        <ZoomIn className="w-8 h-8 text-white drop-shadow-lg" />
-                      </div>
-                    </motion.div>
-                  )
-                })}
-              </div>
-
-              {/* Zoom hint */}
-              <div className="flex items-center justify-center gap-1.5 text-[#8B97C8]">
-                <ZoomIn className="w-3.5 h-3.5" />
-                <span className="font-space-mono text-xs">Tap image to zoom in</span>
-              </div>
-
-              {/* Vote buttons */}
-              <div className="w-full space-y-2">
-                <p className="font-orbitron text-xl font-black text-[#FF6B1A] uppercase tracking-widest text-center">
-                  Which is Real?
-                </p>
-                <div className="grid grid-cols-2 gap-4">
-                  {(['A', 'B'] as const).map((option) => (
-                    <motion.button
-                      key={option}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.96 }}
-                      onClick={() => handleVote(option)}
-                      className="border-2 border-[#FF6B1A] bg-[#FF6B1A]/10 hover:bg-[#FF6B1A]/25 hover:shadow-[0_0_20px_rgba(255,107,26,0.35)] transition-all py-3 px-4 text-center"
-                    >
-                      <span className="font-space-mono text-2xl font-bold text-[#F5F0E8]">
-                        {option}
-                      </span>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {streak > 0 ? (
+          <span className="font-body font-semibold text-sm text-[#FFC94D]">🔥 {streak}-day streak</span>
+        ) : (
+          <span className="font-body text-sm text-[#6E77A8]">
+            Round {roundIndex + 1} of {rounds.length}
+          </span>
+        )}
       </div>
 
-      {/* Lightbox zoom overlay */}
+      <h1 className="text-center font-display font-extrabold text-[38px] text-[#FFF8F0] mb-6">
+        Which one's real?
+      </h1>
+
+      <AnimatePresence mode="wait">
+        {phase === 'reveal' && roundResult ? (
+          <motion.div
+            key="reveal"
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex flex-col items-center gap-5"
+          >
+            <div className="grid grid-cols-2 gap-6 w-full">
+              {(['A', 'B'] as const).map((opt) => {
+                const url = opt === 'A' ? imageA : imageB
+                const isReal = opt === roundResult.correctChoice
+                return (
+                  <div
+                    key={opt}
+                    className={`relative overflow-hidden rounded-[24px] border-4 aspect-[4/3] ${
+                      isReal ? 'border-[#57E6D2] shadow-[0_0_40px_rgba(87,230,210,0.25)]' : 'border-white/10'
+                    }`}
+                  >
+                    <img
+                      src={url}
+                      alt={`Option ${opt}`}
+                      className="w-full h-full object-cover"
+                      style={isReal ? undefined : { filter: 'saturate(.6) brightness(.8)' }}
+                    />
+                    <span
+                      className={`absolute top-3 left-3 rounded-full px-3 py-1 font-display font-extrabold text-sm ${
+                        isReal ? 'bg-[#57E6D2] text-[#151936]' : 'bg-[#FF6A6A] text-[#151936]'
+                      }`}
+                    >
+                      {isReal ? '✓ REAL' : '🤖 AI'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+
+            <h2
+              className="font-display font-extrabold text-3xl"
+              style={{ color: roundResult.correct ? '#57E6D2' : '#FF6A6A' }}
+            >
+              {roundResult.correct ? 'Nailed it!' : 'Fooled!'}
+            </h2>
+
+            <Button size="lg" className="w-full max-w-sm" onClick={handleNext}>
+              {roundIndex + 1 < rounds.length ? 'Next round →' : 'See results 🎯'}
+            </Button>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="playing"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex flex-col items-center gap-6"
+          >
+            <div className="grid grid-cols-2 gap-6 w-full">
+              {(['A', 'B'] as const).map((opt) => {
+                const url = opt === 'A' ? imageA : imageB
+                const badge =
+                  opt === 'A'
+                    ? 'bg-[#FF8552] text-[#151936] shadow-[0_4px_0_#C25327]'
+                    : 'bg-[#57E6D2] text-[#151936] shadow-[0_4px_0_#2FA391]'
+                return (
+                  <motion.div
+                    key={opt}
+                    whileHover={{ y: -4 }}
+                    className="relative aspect-[4/3] cursor-zoom-in"
+                    onClick={() => setZoomedImage(url)}
+                  >
+                    <div
+                      className={`absolute -top-3.5 -left-3.5 w-11 h-11 rounded-[14px] flex items-center justify-center font-display font-extrabold text-xl z-20 ${badge}`}
+                    >
+                      {opt}
+                    </div>
+                    <img
+                      src={url}
+                      alt={`Option ${opt}`}
+                      className="w-full h-full object-cover rounded-[24px] border-[3px] border-white/10"
+                    />
+                    {opt === 'A' && (
+                      <span className="absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-[#151936]/70 backdrop-blur-sm px-3 py-1 font-body text-xs text-[#FFF8F0]">
+                        <ZoomIn className="w-3.5 h-3.5" /> tap to zoom
+                      </span>
+                    )}
+                  </motion.div>
+                )
+              })}
+            </div>
+
+            <div className="grid grid-cols-2 gap-6 w-full">
+              <button
+                onClick={() => handleVote('A')}
+                className="h-16 rounded-[16px] bg-[#FF8552] text-[#151936] font-display font-extrabold text-lg shadow-[0_6px_0_#C25327] hover:translate-y-[2px] hover:shadow-[0_4px_0_#C25327] active:translate-y-[2px] active:shadow-[0_4px_0_#C25327] transition-all"
+              >
+                A is real
+              </button>
+              <button
+                onClick={() => handleVote('B')}
+                className="h-16 rounded-[16px] bg-[#57E6D2] text-[#151936] font-display font-extrabold text-lg shadow-[0_6px_0_#2FA391] hover:translate-y-[2px] hover:shadow-[0_4px_0_#2FA391] active:translate-y-[2px] active:shadow-[0_4px_0_#2FA391] transition-all"
+              >
+                B is real
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Lightbox */}
       <AnimatePresence>
         {zoomedImage && (
           <motion.div
@@ -702,18 +500,11 @@ const DailyChallenge: React.FC = () => {
             >
               <button
                 onClick={() => setZoomedImage(null)}
-                className="absolute -top-3 -right-3 z-10 bg-[#111840] border border-[#2A3468] hover:border-[#FF6B1A] p-1.5 transition-colors"
+                className="absolute -top-3 -right-3 z-10 rounded-full bg-[#1F2450] border border-white/10 hover:border-[#FF8552] p-2 transition-colors"
               >
-                <X className="w-4 h-4 text-[#F5F0E8]" />
+                <X className="w-4 h-4 text-[#FFF8F0]" />
               </button>
-              <img
-                src={zoomedImage}
-                alt="Zoomed"
-                className="w-full max-h-[85vh] object-contain border-2 border-[#2A3468]"
-              />
-              <p className="text-center font-space-mono text-xs text-[#8B97C8] mt-2">
-                Click outside or press Esc to close
-              </p>
+              <img src={zoomedImage} alt="Zoomed" className="w-full max-h-[85vh] object-contain rounded-[16px]" />
             </motion.div>
           </motion.div>
         )}

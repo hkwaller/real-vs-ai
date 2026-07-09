@@ -1,15 +1,39 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Calendar, Trophy, Loader2 } from 'lucide-react'
-import { fetchSchedule, getDailyScores, getTodayDate, type RoundDetail } from '@/lib/dailyChallenge'
+import {
+  fetchSchedule,
+  getDailyScores,
+  getTodayDate,
+  type RoundDetail,
+} from '@/lib/dailyChallenge'
 
 type CardStatus = 'loading' | 'available' | 'completed' | 'no_challenge'
+
+// Consecutive days (ending today or yesterday) that have a saved score.
+function computeStreak(): number {
+  const scores = getDailyScores()
+  let streak = 0
+  const d = new Date()
+  // Allow the streak to still count if today isn't done yet.
+  const todayKey = getTodayDate()
+  if (!scores[todayKey]) d.setDate(d.getDate() - 1)
+  for (;;) {
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    if (!scores[`${yyyy}-${mm}-${dd}`]) break
+    streak++
+    d.setDate(d.getDate() - 1)
+  }
+  return streak
+}
 
 const DailyChallengeCard: React.FC = () => {
   const navigate = useNavigate()
   const [status, setStatus] = useState<CardStatus>('loading')
   const [roundDetails, setRoundDetails] = useState<RoundDetail[]>([])
+  const streak = computeStreak()
 
   useEffect(() => {
     async function check() {
@@ -23,88 +47,63 @@ const DailyChallengeCard: React.FC = () => {
       }
 
       const schedule = await fetchSchedule()
-      if (schedule?.[today]) {
-        setStatus('available')
-      } else {
-        setStatus('no_challenge')
-      }
+      setStatus(schedule?.[today] ? 'available' : 'no_challenge')
     }
     check()
   }, [])
 
+  const squares = Array.from({ length: 5 }).map((_, i) => {
+    if (status === 'completed') {
+      const rd = roundDetails[i]
+      if (!rd) return 'empty'
+      return rd.correct ? 'correct' : 'wrong'
+    }
+    return 'empty'
+  })
+
   return (
-    <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-6 space-y-5 hover:border-[#FFB830]/50 transition-colors">
-      <div>
-        <p className="mission-label mb-2">Daily Challenge</p>
-        <h2 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase tracking-wide flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-[#FFB830]" />
-          Today's Mission
-        </h2>
-        <p className="text-[#8B97C8] text-sm mt-2">
-          {status === 'loading' && "Loading today's challenge..."}
-          {status === 'available' && 'A new challenge awaits. Prove your instincts.'}
-          {status === 'completed' && "You've completed today's challenge."}
-          {status === 'no_challenge' && 'No challenge scheduled for today.'}
-        </p>
+    <div className="rounded-[24px] border border-white/[0.07] bg-[#1F2450] p-6">
+      <p className="font-body font-bold text-xs tracking-[0.15em] uppercase text-[#57E6D2] mb-2">
+        Daily challenge
+      </p>
+      <h2 className="font-display font-bold text-[#FFF8F0] text-2xl">Today's five</h2>
+      <p className="text-[#9AA3D0] text-sm mt-2">
+        {status === 'loading' && 'Loading today’s challenge…'}
+        {status === 'available' && 'Five new rounds every day — finish before midnight.'}
+        {status === 'completed' && "Nice — you've finished today's five."}
+        {status === 'no_challenge' && 'No challenge today. Check back tomorrow.'}
+      </p>
+
+      {/* Progress squares */}
+      <div className="flex items-center gap-2 mt-5">
+        {squares.map((s, i) => (
+          <div
+            key={i}
+            className={`w-3 h-3 rounded-[4px] ${
+              s === 'correct'
+                ? 'bg-[#57E6D2]'
+                : s === 'wrong'
+                  ? 'bg-[#FF6A6A]'
+                  : 'bg-white/10'
+            }`}
+          />
+        ))}
       </div>
 
-      {status === 'loading' && (
-        <div className="flex justify-center py-2">
-          <Loader2 className="w-5 h-5 animate-spin text-[#FFB830]" />
-        </div>
-      )}
-
-      {status === 'available' && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#FFB830] animate-pulse" />
-            <span className="font-space-mono text-xs text-[#FFB830]">CHALLENGE ACTIVE</span>
-          </div>
-          <Button size="lg" className="w-full" onClick={() => navigate('/daily')}>
-            Play Now
+      <div className="flex items-center justify-between mt-6">
+        {status === 'completed' || status === 'no_challenge' ? (
+          <Button variant="ghost" size="sm" className="rounded-full" onClick={() => navigate('/daily/archive')}>
+            Past challenges
           </Button>
-        </div>
-      )}
-
-      {status === 'completed' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Trophy className="w-4 h-4 text-[#FFB830]" />
-              <span className="mission-label">Result</span>
-            </div>
-            <span className="font-space-mono text-lg font-bold text-[#FFB830]">
-              {roundDetails.filter((r) => r.correct).length}
-              <span className="text-[#8B97C8] text-sm font-normal">/{roundDetails.length} correct</span>
-            </span>
-          </div>
-          {roundDetails.length > 0 && (
-            <div className="flex items-center gap-1.5">
-              {roundDetails.map((rd, i) => (
-                <div
-                  key={i}
-                  className={`w-6 h-6 flex items-center justify-center text-xs font-bold font-space-mono ${
-                    rd.correct
-                      ? 'bg-[#00FFE5]/20 text-[#00FFE5] border border-[#00FFE5]/40'
-                      : 'bg-[#FF3D1A]/20 text-[#FF3D1A] border border-[#FF3D1A]/40'
-                  }`}
-                >
-                  {rd.correct ? '✓' : '✗'}
-                </div>
-              ))}
-            </div>
-          )}
-          <Button variant="outline" size="sm" className="w-full" asChild>
-            <Link to="/daily/archive">Past Challenges</Link>
+        ) : (
+          <Button variant="secondary" onClick={() => navigate('/daily')} disabled={status === 'loading'}>
+            Keep playing
           </Button>
-        </div>
-      )}
-
-      {status === 'no_challenge' && (
-        <Button variant="outline" size="sm" className="w-full" asChild>
-          <Link to="/daily/archive">Past Challenges</Link>
-        </Button>
-      )}
+        )}
+        {streak > 0 && (
+          <span className="font-body font-semibold text-sm text-[#FFC94D]">🔥 {streak}-day streak</span>
+        )}
+      </div>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useAuth, useUser } from '@clerk/react'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,10 +11,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import GameLayout from '@/components/GameLayout'
+import CountdownRing from '@/components/CountdownRing'
 import AdBanner from '@/components/AdBanner'
 import { supabase } from '@/lib/supabase'
-import { cn } from '@/lib/utils'
-import { Users, Trophy, Crown, UserX, X, Edit3Icon, Rocket, Loader2 } from 'lucide-react'
+import { Users, UserX, X, Loader2 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import {
   RoomProvider,
@@ -34,7 +34,6 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const navigate = useNavigate()
   const [timeLeft, setTimeLeft] = useState(0)
   const [showResult, setShowResult] = useState(false)
-  const [showScoreDialog, setShowScoreDialog] = useState(false)
   const [initialized, setInitialized] = useState(false)
   const initRunningRef = useRef(false)
   const [showPlayersModal, setShowPlayersModal] = useState(false)
@@ -59,6 +58,11 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
 
   const others = useOthers()
   const broadcast = useBroadcastEvent()
+
+  // Rank of each player entering the current round (for ▲/▼ carets on reveal).
+  const prevRanksRef = useRef<Record<string, number>>({})
+  // Game-wide "fooled by the AI" tally.
+  const gameStatsRef = useRef({ totalVotes: 0, wrongVotes: 0 })
 
   const currentRoundIndex = currentRoundIndexObj?.value ?? 0
   const gameStatus = gameStatusObj?.value
@@ -143,7 +147,6 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
       (f) => !f.name.startsWith('.') && f.name !== '.emptyFolderPlaceholder',
     )
 
-    // Exclude filenames already used in this game
     const usedNames = new Set(
       (roundsStorage ?? []).map((r) => r.realImageUrl.split('/real/').pop() ?? ''),
     )
@@ -264,7 +267,6 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     prevRoundIdRef.current = currentRound.id
 
     setShowResult(false)
-    setShowScoreDialog(false)
     setTimeLeft(settings?.timeLimit ?? 15)
     preloadNextRound(currentRoundIndex + 1)
   }, [currentRound?.id])
@@ -297,6 +299,19 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     return () => document.removeEventListener('keydown', handler)
   }, [])
 
+  // Confetti + history save when the game ends.
+  useEffect(() => {
+    if (gameStatus !== 'finished') return
+    confetti({ particleCount: 160, spread: 90, origin: { y: 0.5 } })
+    if (players.length > 0) {
+      const history = JSON.parse(localStorage.getItem('real_vs_ai_history') || '[]')
+      if (!history.some((h: { gameId: string }) => h.gameId === code)) {
+        history.push({ date: new Date().toISOString(), gameId: code, players })
+        localStorage.setItem('real_vs_ai_history', JSON.stringify(history))
+      }
+    }
+  }, [gameStatus])
+
   const preloadNextRound = (nextIndex: number) => {
     const nextRound = roundsStorage?.[nextIndex]
     if (nextRound) {
@@ -310,14 +325,16 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const revealResult = () => {
     if (showResult) return
     setShowResult(true)
-    setTimeout(() => setShowScoreDialog(true), 2000)
     if (!currentRound) return
 
     const isRealLeft = currentRound.id.charCodeAt(0) % 2 === 0
     const correctChoice = isRealLeft ? 'A' : 'B'
     const tl = settings?.timeLimit ?? 15
 
-    const updates = others
+    // Snapshot ranking before this round's points land.
+    prevRanksRef.current = Object.fromEntries(players.map((p, i) => [p.id, i + 1]))
+
+    const results = others
       .filter((o) => !o.presence.isHost && o.presence.hasVoted)
       .map((o) => {
         const choice = o.presence.currentVote
@@ -326,22 +343,22 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
         const gracePeriod = 3
         const scoringWindow = tl - gracePeriod
         const pts = tr >= scoringWindow ? 100 : Math.round(100 * (tr / scoringWindow))
-        return {
-          playerId: o.presence.playerId,
-          increment: correct ? pts : 0,
-        }
+        return { playerId: o.presence.playerId, correct, increment: correct ? pts : 0 }
       })
 
-    updateScores(updates)
+    updateScores(results.map((r) => ({ playerId: r.playerId, increment: r.increment })))
+
+    gameStatsRef.current.totalVotes += results.length
+    gameStatsRef.current.wrongVotes += results.filter((r) => !r.correct).length
 
     const scoresMap: Record<string, number> = {}
-    updates.forEach((u) => {
-      scoresMap[u.playerId] = u.increment
+    results.forEach((r) => {
+      scoresMap[r.playerId] = r.increment
     })
     broadcast({ type: 'ROUND_REVEALED', correctChoice, scores: scoresMap })
 
-    const anyCorrect = updates.some((u) => u.increment > 0)
-    if (anyCorrect) {
+    const correctCount = results.filter((r) => r.correct).length
+    if (results.length > 0 && correctCount * 2 > results.length) {
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
     }
   }
@@ -367,93 +384,105 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   // Loading state
   if (!gameStatus || !currentRound) {
     return (
-      <div className="min-h-screen bg-[#0B0F2E] flex items-center justify-center">
+      <div className="cosmic-bg min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-2 h-2 rounded-full bg-[#FF6B1A] animate-pulse mx-auto" />
-          <p className="font-space-mono text-sm text-[#8B97C8]">// Initializing mission...</p>
+          <Loader2 className="w-8 h-8 text-[#FF8552] animate-spin mx-auto" />
+          <p className="font-body text-sm text-[#9AA3D0]">Setting up the party…</p>
         </div>
       </div>
     )
   }
 
-  // Game over
+  // Game over — podium
   if (gameStatus === 'finished') {
-    if (players.length > 0) {
-      const history = JSON.parse(localStorage.getItem('real_vs_ai_history') || '[]')
-      const gameRecord = { date: new Date().toISOString(), gameId: code, players }
-      if (!history.some((h: { gameId: string }) => h.gameId === code)) {
-        history.push(gameRecord)
-        localStorage.setItem('real_vs_ai_history', JSON.stringify(history))
-      }
+    const winner = players[0]
+    const podiumRanks = [2, 1, 3]
+    const podiumHeights: Record<number, number> = { 1: 160, 2: 110, 3: 80 }
+    const podiumColor: Record<number, string> = {
+      1: 'bg-[#FFC94D] text-[#151936]',
+      2: 'bg-white/5 text-[#9AA3D0]',
+      3: 'bg-white/5 text-[#9AA3D0]',
     }
+    const rest = players.slice(3)
+    const { totalVotes, wrongVotes } = gameStatsRef.current
+    const fooledPct = totalVotes > 0 ? Math.round((wrongVotes / totalVotes) * 100) : null
 
     return (
-      <GameLayout>
-        <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-10 max-w-2xl mx-auto text-center space-y-8">
-          <div>
-            <Trophy className="w-16 h-16 text-[#FFB830] mx-auto mb-4" />
-            <p className="mission-label mb-2">Debrief</p>
-            <h1 className="font-orbitron text-5xl font-black text-[#FF6B1A] uppercase text-glow-orange">
-              Mission Complete
-            </h1>
-            <p className="text-[#8B97C8] mt-2">Final Results</p>
-          </div>
+      <GameLayout className="max-w-4xl">
+        <div className="text-center mb-2">
+          <h1 className="font-display font-extrabold text-[52px] leading-tight text-[#FFF8F0]">
+            🏆 {winner ? `${winner.name} takes it!` : 'Game over!'}
+          </h1>
+          <p className="text-[#9AA3D0] mt-1">
+            {settings?.rounds ?? players.length} rounds · {players.length} players
+            {fooledPct !== null ? ` · ${fooledPct}% fooled by the AI` : ''}
+          </p>
+        </div>
 
-          <div className="space-y-2 text-left">
-            {players.map((player, index) => (
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
-                key={player.id}
-                className={cn(
-                  'flex items-center justify-between p-4 border',
-                  index === 0
-                    ? 'bg-[#FFB830]/10 border-[#FFB830]/50'
-                    : 'bg-[#1A2355] border-[#2A3468]',
-                )}
-              >
-                <div className="flex items-center gap-4">
-                  <span
-                    className={cn(
-                      'font-space-mono font-bold w-8 h-8 flex items-center justify-center text-sm',
-                      index === 0 ? 'text-[#FFB830]' : 'text-[#8B97C8]',
-                    )}
-                  >
-                    #{index + 1}
+        {/* Podium */}
+        <div className="flex items-end justify-center gap-4 mt-10 mb-8">
+          {podiumRanks.map((rank) => {
+            const p = players[rank - 1]
+            if (!p) return <div key={rank} className="w-1/4" />
+            const isWinner = rank === 1
+            return (
+              <div key={rank} className="flex flex-col items-center gap-2 w-1/4 max-w-[180px]">
+                {isWinner && <span className="text-3xl leading-none">👑</span>}
+                <span className="text-4xl leading-none">{p.emoji}</span>
+                <span className="font-display font-bold text-[#FFF8F0]">{p.name}</span>
+                <motion.div
+                  initial={{ height: 0 }}
+                  animate={{ height: podiumHeights[rank] }}
+                  transition={{ delay: 0.15 * (4 - rank), type: 'spring', stiffness: 120, damping: 16 }}
+                  className={`w-full rounded-t-[16px] flex flex-col items-center justify-center gap-1 ${podiumColor[rank]}`}
+                  style={{ minHeight: 60 }}
+                >
+                  <span className="font-display font-extrabold text-3xl leading-none">{rank}</span>
+                  <span className={`font-body font-semibold text-sm ${isWinner ? 'text-[#151936]/70' : 'text-[#6E77A8]'}`}>
+                    {p.score} pts
                   </span>
-                  <span className="text-2xl">{player.emoji}</span>
-                  <span className="font-orbitron font-bold text-[#F5F0E8]">{player.name}</span>
-                  {index === 0 && <Crown className="w-5 h-5 text-[#FFB830]" />}
-                </div>
-                <span className="font-space-mono font-bold text-xl text-[#FFB830]">
-                  {player.score} PTS
-                </span>
-              </motion.div>
+                </motion.div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Remaining players */}
+        {rest.length > 0 && (
+          <div className="space-y-2 max-w-xl mx-auto mb-8">
+            {rest.map((p, i) => (
+              <div
+                key={p.id}
+                className="flex items-center gap-3 rounded-[16px] bg-white/5 px-4 py-2.5"
+              >
+                <span className="font-display font-bold text-[#6E77A8] w-6">{i + 4}</span>
+                <span className="text-xl leading-none">{p.emoji}</span>
+                <span className="font-display font-bold text-[#FFF8F0]">{p.name}</span>
+                <span className="font-body font-semibold text-[#9AA3D0] ml-auto">{p.score} pts</span>
+              </div>
             ))}
           </div>
+        )}
 
-          <div className="flex gap-4 justify-center">
-            <Button onClick={() => navigate('/')} variant="outline" size="lg">
-              Return to Base
-            </Button>
-            <Button
-              onClick={() => {
-                resetGame()
-                navigate(`/lobby/${code}`, {
-                  state: {
-                    rounds: settings?.rounds ?? 10,
-                    timeLimit: settings?.timeLimit ?? 15,
-                    revealMode: settings?.revealMode ?? 'instant',
-                  },
-                })
-              }}
-              size="lg"
-            >
-              <Rocket className="mr-2 h-4 w-4" />
-              Play Again
-            </Button>
-          </div>
+        <div className="flex gap-4 justify-center">
+          <Button
+            size="lg"
+            onClick={() => {
+              resetGame()
+              navigate(`/lobby/${code}`, {
+                state: {
+                  rounds: settings?.rounds ?? 10,
+                  timeLimit: settings?.timeLimit ?? 15,
+                  revealMode: settings?.revealMode ?? 'instant',
+                },
+              })
+            }}
+          >
+            Play again 🔁
+          </Button>
+          <Button variant="ghost" size="lg" onClick={() => navigate('/')}>
+            Back home
+          </Button>
         </div>
       </GameLayout>
     )
@@ -462,288 +491,261 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const isRealLeft = currentRound.id.charCodeAt(0) % 2 === 0
   const leftImage = isRealLeft ? currentRound.realImageUrl : currentRound.aiImageUrl
   const rightImage = isRealLeft ? currentRound.aiImageUrl : currentRound.realImageUrl
+  const correctChoice: 'A' | 'B' = isRealLeft ? 'A' : 'B'
+
+  const totalPlayers = storedPlayers?.length ?? 0
+  const votedCount = Object.keys(votes).length
+  const correctCount = Object.values(votes).filter((v) => v === correctChoice).length
+  const totalRounds = roundsStorage?.length ?? settings?.rounds ?? 0
 
   const playerLookup = new Map(
     (storedPlayers ?? []).map((p) => [p.id, { ...p, score: scores?.get(p.id) ?? 0 }]),
   )
 
-  return (
-    <GameLayout className="max-w-6xl">
-      <div className="flex flex-col h-full gap-4">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div className="space-y-0.5">
-            <p className="mission-label">Round</p>
-            <div className="font-orbitron text-2xl font-bold text-[#F5F0E8]">
-              {currentRoundIndex + 1}{' '}
-              <span className="text-[#8B97C8]">/ {settings?.rounds ?? '?'}</span>
-            </div>
-          </div>
+  const liveVotesVisible = settings?.revealMode === 'instant'
 
-          <div
-            className={cn(
-              'font-space-mono text-5xl font-bold px-6 py-3 border-2 min-w-[120px] text-center transition-all duration-300',
-              timeLeft <= 5
-                ? 'text-[#FF3D1A] border-[#FF3D1A] shadow-[0_0_20px_rgba(255,61,26,0.5)] animate-pulse'
-                : 'text-[#FF6B1A] border-[#FF6B1A] shadow-[0_0_15px_rgba(255,107,26,0.3)]',
-            )}
-          >
-            {timeLeft}
-          </div>
+  const VoterCluster: React.FC<{ side: 'A' | 'B' }> = ({ side }) => {
+    const voters = Object.entries(votes).filter(([, choice]) => choice === side)
+    if (voters.length === 0) return null
+    return (
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex -space-x-3 px-4 py-2 rounded-full bg-[#151936]/70 backdrop-blur-sm z-20">
+        {voters.map(([pid], index) => {
+          const player = playerLookup.get(pid)
+          if (!player) return null
+          return (
+            <motion.span
+              key={pid}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20, delay: index * 0.04 }}
+              className="text-3xl drop-shadow-lg"
+              title={player.name}
+            >
+              {player.emoji}
+            </motion.span>
+          )
+        })}
+      </div>
+    )
+  }
 
-          <div className="flex items-center gap-4">
-            {!showResult && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSkipPicture}
-                disabled={isReplacing}
-              >
-                {isReplacing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Skip Picture'}
-              </Button>
-            )}
-            {settings?.revealMode === 'after_round' && !showResult && (
-              <Button variant="destructive" size="sm" onClick={() => revealResult()}>
-                Reveal
-              </Button>
-            )}
-            <div className="flex items-center gap-3">
-              <div className="text-right space-y-0.5">
-                <p className="mission-label">Votes</p>
-                <p className="font-space-mono text-sm text-[#F5F0E8]">
-                  {Object.keys(votes).length} / {storedPlayers?.length ?? 0}
-                </p>
+  const ManagePlayers = (
+    <Dialog open={showPlayersModal} onOpenChange={setShowPlayersModal}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Manage players">
+          <Users className="w-5 h-5" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-sm rounded-[24px] bg-[#1F2450] border-white/[0.07] text-[#FFF8F0]">
+        <DialogHeader>
+          <DialogTitle className="font-display font-extrabold text-[#FFF8F0]">Players</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-2 mt-2">
+          {players.length === 0 && (
+            <p className="font-body text-sm text-[#9AA3D0] text-center py-4">No players yet</p>
+          )}
+          {players.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center justify-between rounded-[14px] bg-white/5 px-3 py-2"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{p.emoji}</span>
+                <div>
+                  <p className="font-display font-bold text-sm text-[#FFF8F0]">{p.name}</p>
+                  <p className="font-body text-xs text-[#9AA3D0]">{p.score} pts</p>
+                </div>
               </div>
-              <Dialog open={showPlayersModal} onOpenChange={setShowPlayersModal}>
-                <DialogTrigger asChild>
-                  <Button variant="secondary" size="icon">
-                    <Edit3Icon className="w-4 h-4" />
+              {confirmKickId === p.id ? (
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-8 px-2 text-xs"
+                    onClick={() => handleKickPlayer(p.id)}
+                  >
+                    Kick
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-sm bg-[#111840] border-[#2A3468] text-[#F5F0E8]">
-                  <DialogHeader>
-                    <DialogTitle className="font-orbitron uppercase tracking-widest text-[#F5F0E8]">
-                      Operatives
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="flex flex-col gap-2 mt-2">
-                    {players.length === 0 && (
-                      <p className="font-space-mono text-xs text-[#8B97C8] text-center py-4">
-                        // No operatives yet
-                      </p>
-                    )}
-                    {players.map((p) => (
-                      <div
-                        key={p.id}
-                        className="flex items-center justify-between border border-[#2A3468] px-3 py-2 bg-[#1A2355]"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{p.emoji}</span>
-                          <div>
-                            <p className="font-orbitron text-xs font-bold text-[#F5F0E8]">
-                              {p.name}
-                            </p>
-                            <p className="font-space-mono text-xs text-[#8B97C8]">{p.score} pts</p>
-                          </div>
-                        </div>
-                        {confirmKickId === p.id ? (
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="h-7 px-2 text-xs"
-                              onClick={() => handleKickPlayer(p.id)}
-                            >
-                              Kick
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 px-2"
-                              onClick={() => setConfirmKickId(null)}
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 hover:text-[#FF3D1A]"
-                            onClick={() => setConfirmKickId(p.id)}
-                          >
-                            <UserX className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-        </div>
-
-        {/* Images */}
-        <div className="flex-1 min-h-[500px] relative">
-          <div
-            className={cn(
-              'grid grid-cols-2 gap-6 h-full transition-all duration-500',
-              showScoreDialog ? 'opacity-30 scale-95 blur-sm' : 'opacity-100',
-            )}
-          >
-            {/* Image A */}
-            <div className="relative">
-              <div className="absolute top-3 left-3 z-10 bg-[#0B0F2E]/80 px-3 py-1.5 border border-[#2A3468]">
-                <span className="font-orbitron text-lg font-bold text-[#F5F0E8]">A</span>
-              </div>
-              <img
-                src={leftImage}
-                className={cn(
-                  'w-full h-full object-cover border-4 transition-all duration-500',
-                  showResult && isRealLeft
-                    ? 'border-[#00FFE5] shadow-[0_0_30px_rgba(0,255,229,0.4)]'
-                    : '',
-                  showResult && !isRealLeft
-                    ? 'border-[#FF3D1A] shadow-[0_0_30px_rgba(255,61,26,0.4)]'
-                    : '',
-                  !showResult ? 'border-[#2A3468]' : '',
-                )}
-              />
-              <AnimatePresence mode="popLayout">
-                {(showResult || settings?.revealMode === 'instant') &&
-                  Object.entries(votes).filter(([_, choice]) => choice === 'A').length > 0 && (
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex -space-x-4 z-20 px-4 py-2 bg-[#0B0F2E]/70 backdrop-blur-sm border border-[#2A3468] min-h-[60px] items-center justify-center">
-                      {Object.entries(votes)
-                        .filter(([_, choice]) => choice === 'A')
-                        .map(([pid, _], index) => {
-                          const player = playerLookup.get(pid)
-                          if (!player) return null
-                          return (
-                            <motion.div
-                              key={pid}
-                              initial={{ scale: 0, y: 20, opacity: 0 }}
-                              animate={{ scale: 1, y: 0, opacity: 1 }}
-                              exit={{ scale: 0, opacity: 0 }}
-                              transition={{
-                                type: 'spring',
-                                stiffness: 300,
-                                damping: 20,
-                                delay: settings?.revealMode === 'after_round' ? index * 0.05 : 0,
-                              }}
-                              className="text-4xl drop-shadow-lg relative hover:z-30 hover:scale-125 transition-transform cursor-default"
-                              title={player.name}
-                            >
-                              {player.emoji}
-                            </motion.div>
-                          )
-                        })}
-                    </div>
-                  )}
-              </AnimatePresence>
-            </div>
-
-            {/* Image B */}
-            <div className="relative">
-              <div className="absolute top-3 left-3 z-10 bg-[#0B0F2E]/80 px-3 py-1.5 border border-[#2A3468]">
-                <span className="font-orbitron text-lg font-bold text-[#F5F0E8]">B</span>
-              </div>
-              <img
-                src={rightImage}
-                className={cn(
-                  'w-full h-full object-cover border-4 transition-all duration-500',
-                  showResult && !isRealLeft
-                    ? 'border-[#00FFE5] shadow-[0_0_30px_rgba(0,255,229,0.4)]'
-                    : '',
-                  showResult && isRealLeft
-                    ? 'border-[#FF3D1A] shadow-[0_0_30px_rgba(255,61,26,0.4)]'
-                    : '',
-                  !showResult ? 'border-[#2A3468]' : '',
-                )}
-              />
-              <AnimatePresence mode="popLayout">
-                {(showResult || settings?.revealMode === 'instant') &&
-                  Object.entries(votes).filter(([_, choice]) => choice === 'B').length > 0 && (
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex -space-x-4 z-20 px-4 py-2 bg-[#0B0F2E]/70 backdrop-blur-sm border border-[#2A3468] min-h-[60px] items-center justify-center">
-                      {Object.entries(votes)
-                        .filter(([_, choice]) => choice === 'B')
-                        .map(([pid, _], index) => {
-                          const player = playerLookup.get(pid)
-                          if (!player) return null
-                          return (
-                            <motion.div
-                              key={pid}
-                              initial={{ scale: 0, y: 20, opacity: 0 }}
-                              animate={{ scale: 1, y: 0, opacity: 1 }}
-                              exit={{ scale: 0, opacity: 0 }}
-                              transition={{
-                                type: 'spring',
-                                stiffness: 300,
-                                damping: 20,
-                                delay: settings?.revealMode === 'after_round' ? index * 0.05 : 0,
-                              }}
-                              className="text-4xl drop-shadow-lg relative hover:z-30 hover:scale-125 transition-transform cursor-default"
-                              title={player.name}
-                            >
-                              {player.emoji}
-                            </motion.div>
-                          )
-                        })}
-                    </div>
-                  )}
-              </AnimatePresence>
-            </div>
-          </div>
-
-          {/* Round Result Overlay */}
-          <AnimatePresence>
-            {showScoreDialog && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="absolute inset-0 flex items-center justify-center z-20"
-              >
-                <div className="corner-bracket w-full max-w-2xl bg-[#0B0F2E]/95 border border-[#FF6B1A] backdrop-blur-xl p-8 space-y-6">
-                  <div className="text-center">
-                    <p className="mission-label mb-2">Round Debrief</p>
-                    <h2 className="font-orbitron text-3xl font-bold text-[#F5F0E8] uppercase">
-                      Option <span className="text-[#00FFE5]">{isRealLeft ? 'A' : 'B'}</span> was{' '}
-                      <span className="text-[#00FFE5]">REAL</span>
-                    </h2>
-                  </div>
-
-                  <div className="space-y-2 max-h-[280px] overflow-y-auto">
-                    {players.map((player, index) => (
-                      <div
-                        key={player.id}
-                        className="flex items-center justify-between p-3 border border-[#2A3468] bg-[#111840]"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="font-space-mono text-xs text-[#8B97C8] w-6">
-                            #{index + 1}
-                          </span>
-                          <span className="text-2xl">{player.emoji}</span>
-                          <span className="font-orbitron text-sm font-bold text-[#F5F0E8]">
-                            {player.name}
-                          </span>
-                          {index === 0 && <Crown className="w-4 h-4 text-[#FFB830]" />}
-                        </div>
-                        <span className="font-space-mono font-bold text-[#FFB830]">
-                          {player.score} PTS
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <Button onClick={nextRound} size="xl" className="w-full">
-                    <Rocket className="mr-2 h-4 w-4" />
-                    Next Round
+                  <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setConfirmKickId(null)}>
+                    <X className="w-3 h-3" />
                   </Button>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0 border-0 hover:text-[#FF6A6A]"
+                  onClick={() => setConfirmKickId(p.id)}
+                >
+                  <UserX className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+          ))}
         </div>
+      </DialogContent>
+    </Dialog>
+  )
+
+  // Reveal view (3-column) — replaces the old blur-overlay modal.
+  if (showResult) {
+    const winnerLetter = correctChoice
+    return (
+      <GameLayout className="max-w-6xl">
+        <h1 className="text-center font-display font-extrabold text-[34px] md:text-[44px] text-[#FFF8F0] mb-6">
+          <span className="text-[#57E6D2]">{winnerLetter} was real!</span>{' '}
+          {correctCount} of {totalPlayers} got it 🎉
+        </h1>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Real photo */}
+          <motion.div
+            initial={{ scale: 0.92, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="relative rounded-[24px] overflow-hidden border-4 border-[#57E6D2] shadow-[0_0_40px_rgba(87,230,210,0.25)] aspect-[4/3]"
+          >
+            <img src={currentRound.realImageUrl} className="w-full h-full object-cover" />
+            <span className="absolute top-3 left-3 rounded-full bg-[#57E6D2] text-[#151936] font-display font-extrabold text-sm px-3 py-1 z-10">
+              ✓ REAL
+            </span>
+            <VoterCluster side={correctChoice} />
+          </motion.div>
+
+          {/* AI photo */}
+          <motion.div
+            initial={{ scale: 0.92, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.05 }}
+            className="relative rounded-[24px] overflow-hidden border-4 border-white/10 aspect-[4/3]"
+          >
+            <img
+              src={currentRound.aiImageUrl}
+              className="w-full h-full object-cover"
+              style={{ filter: 'saturate(.6) brightness(.8)' }}
+            />
+            <span className="absolute top-3 left-3 rounded-full bg-[#FF6A6A] text-[#151936] font-display font-extrabold text-sm px-3 py-1 z-10">
+              🤖 AI
+            </span>
+            <VoterCluster side={correctChoice === 'A' ? 'B' : 'A'} />
+          </motion.div>
+
+          {/* Standings */}
+          <div className="rounded-[24px] border border-white/[0.07] bg-[#1F2450] p-5 flex flex-col">
+            <h3 className="font-display font-bold text-[#FFF8F0] text-lg mb-4">Standings</h3>
+            <div className="space-y-2 flex-1">
+              {players.map((p, i) => {
+                const rank = i + 1
+                const prev = prevRanksRef.current[p.id] ?? rank
+                const delta = prev - rank
+                const isLeader = rank === 1
+                return (
+                  <motion.div
+                    layout
+                    key={p.id}
+                    className={`flex items-center gap-3 rounded-[14px] px-3 py-2 ${
+                      isLeader ? 'bg-[#FFC94D]/12' : 'bg-white/5'
+                    }`}
+                  >
+                    <span className={`font-display font-extrabold w-5 ${isLeader ? 'text-[#FFC94D]' : 'text-[#6E77A8]'}`}>
+                      {rank}
+                    </span>
+                    <span className="text-xl leading-none">{p.emoji}</span>
+                    <span className="font-display font-bold text-[#FFF8F0] truncate">{p.name}</span>
+                    {delta > 0 && (
+                      <span className="font-body text-xs font-bold text-[#57E6D2]">▲{delta}</span>
+                    )}
+                    {delta < 0 && (
+                      <span className="font-body text-xs font-bold text-[#FF6A6A]">▼{-delta}</span>
+                    )}
+                    <span className={`font-display font-extrabold ml-auto ${isLeader ? 'text-[#FFC94D]' : 'text-[#FFF8F0]'}`}>
+                      {p.score}
+                    </span>
+                  </motion.div>
+                )
+              })}
+            </div>
+            <Button className="w-full mt-4" onClick={nextRound}>
+              {currentRoundIndex + 1 >= totalRounds ? 'See results →' : 'Next round →'}
+            </Button>
+          </div>
+        </div>
+        {showAds && <AdBanner />}
+      </GameLayout>
+    )
+  }
+
+  // Round view
+  return (
+    <GameLayout className="max-w-6xl">
+      {/* Top bar */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <span className="font-display font-extrabold text-2xl text-[#FFF8F0]">
+            Round {currentRoundIndex + 1} <span className="text-[#9AA3D0]">of {settings?.rounds ?? '?'}</span>
+          </span>
+          <span className="rounded-full bg-white/5 px-3 py-1.5 font-body text-sm text-[#9AA3D0]">
+            {votedCount} of {totalPlayers} voted
+          </span>
+        </div>
+
+        <CountdownRing value={timeLeft} total={settings?.timeLimit ?? 15} size={76} />
+
+        <div className="flex items-center gap-2">
+          {ManagePlayers}
+          {settings?.revealMode === 'after_round' && (
+            <Button variant="secondary" size="sm" onClick={() => revealResult()}>
+              Reveal
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={handleSkipPicture} disabled={isReplacing}>
+            {isReplacing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Swap this pair ↻'}
+          </Button>
+        </div>
+      </div>
+
+      <h2 className="text-center font-display font-extrabold text-[34px] text-[#FFF8F0] mb-8">
+        Which one's real?
+      </h2>
+
+      {/* Images */}
+      <div className="grid grid-cols-2 gap-8">
+        {(['A', 'B'] as const).map((letter) => {
+          const img = letter === 'A' ? leftImage : rightImage
+          const badge =
+            letter === 'A'
+              ? 'bg-[#FF8552] text-[#151936] shadow-[0_4px_0_#C25327]'
+              : 'bg-[#57E6D2] text-[#151936] shadow-[0_4px_0_#2FA391]'
+          return (
+            <div key={letter} className="relative aspect-[4/3]">
+              <div
+                className={`absolute -top-3.5 -left-3.5 w-11 h-11 rounded-[14px] flex items-center justify-center font-display font-extrabold text-xl z-20 ${badge}`}
+              >
+                {letter}
+              </div>
+              <img
+                src={img}
+                className="w-full h-full object-cover rounded-[24px] border-[3px] border-white/10"
+              />
+              {liveVotesVisible && <VoterCluster side={letter} />}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Progress dots */}
+      <div className="flex items-center justify-center gap-1.5 mt-8">
+        {Array.from({ length: totalRounds }).map((_, idx) => (
+          <div
+            key={idx}
+            className={`h-2 rounded-full transition-colors ${
+              idx < currentRoundIndex
+                ? 'bg-[#57E6D2] w-[22px]'
+                : idx === currentRoundIndex
+                  ? 'bg-[#FF8552] w-[28px]'
+                  : 'bg-white/12 w-[22px]'
+            }`}
+          />
+        ))}
       </div>
       {showAds && <AdBanner />}
     </GameLayout>

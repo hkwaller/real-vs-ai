@@ -7,46 +7,52 @@
 
 @layer base {
   :root {
-    --background: #0B0F2E;
-    --foreground: #F5F0E8;
+    /* Cosmic Arcade palette */
+    --background: #151936; /* deep indigo page */
+    --foreground: #fff8f0; /* text primary */
 
-    --card: #111840;
-    --card-foreground: #F5F0E8;
+    --card: #1f2450; /* card surface */
+    --card-foreground: #fff8f0;
 
-    --popover: #111840;
-    --popover-foreground: #F5F0E8;
+    --popover: #1f2450;
+    --popover-foreground: #fff8f0;
 
-    --primary: #FF6B1A;
-    --primary-foreground: #0B0F2E;
+    --primary: #ff8552; /* coral */
+    --primary-foreground: #151936;
+    --primary-shadow: #c25327; /* coral pressed shadow */
 
-    --secondary: #1A2355;
-    --secondary-foreground: #F5F0E8;
+    --secondary: #57e6d2; /* aqua */
+    --secondary-foreground: #151936;
+    --secondary-shadow: #2fa391; /* aqua pressed shadow */
 
-    --muted: #1A2355;
-    --muted-foreground: #8B97C8;
+    --muted: rgba(255, 255, 255, 0.05);
+    --muted-foreground: #9aa3d0; /* text secondary */
 
-    --accent: #00FFE5;
-    --accent-foreground: #0B0F2E;
+    --accent: #ffc94d; /* sunshine */
+    --accent-foreground: #151936;
 
-    --destructive: #FF3D1A;
-    --border: #2A3468;
-    --input: #1A2355;
-    --ring: #FF6B1A;
+    --destructive: #ff6a6a; /* danger / AI / wrong */
+    --destructive-foreground: #151936;
 
-    --radius: 0.25rem;
+    --border: rgba(255, 255, 255, 0.07);
+    --input: rgba(255, 255, 255, 0.05);
+    --ring: #ff8552;
 
-    --surface: #111840;
-    --surface-2: #1A2355;
-    --amber: #FFB830;
-    --danger: #FF3D1A;
+    --radius: 1.5rem; /* 24px — cards */
+
+    /* Extra named tokens used across screens */
+    --text-muted: #6e77a8;
+    --text-bright-muted: #c6ccf2;
   }
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 2px);
-  --radius-md: var(--radius);
-  --radius-lg: calc(var(--radius) + 4px);
-  --radius-xl: calc(var(--radius) + 8px);
+  --radius-sm: 0.75rem; /* 12px small tiles */
+  --radius-md: 0.875rem; /* 14px small tiles / buttons */
+  --radius-lg: 1.125rem; /* 18px buttons */
+  --radius-xl: var(--radius); /* 24px cards */
+  --radius-2xl: 1.75rem; /* 28px hero cards */
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -65,85 +71,86 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  --font-display: "Baloo 2", sans-serif;
+  --font-body: "Space Grotesk", sans-serif;
 }
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: var(--border);
   }
   body {
-    @apply bg-background text-foreground;
-    font-family: system-ui, sans-serif;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: "Space Grotesk", sans-serif;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: "Baloo 2", sans-serif;
   }
 }
 
 /* Font utilities */
-.font-orbitron {
-  font-family: 'Orbitron', sans-serif;
+.font-display {
+  font-family: "Baloo 2", sans-serif;
 }
-.font-space-mono {
-  font-family: 'Space Mono', monospace;
+.font-body {
+  font-family: "Space Grotesk", sans-serif;
 }
 
-/* Corner bracket card decoration */
+/* Sparse starfield + coral glow for page roots */
+.cosmic-bg {
+  background-color: #151936;
+  background-image:
+    radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 75% 15%, rgba(255, 255, 255, 0.25), transparent),
+    radial-gradient(1px 1px at 40% 70%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 85% 55%, rgba(255, 255, 255, 0.2), transparent),
+    radial-gradient(1px 1px at 12% 85%, rgba(255, 255, 255, 0.25), transparent),
+    radial-gradient(1px 1px at 60% 90%, rgba(255, 255, 255, 0.2), transparent),
+    radial-gradient(1px 1px at 92% 80%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 33% 12%, rgba(255, 255, 255, 0.2), transparent);
+  background-repeat: no-repeat;
+}
+
+/* Compatibility shims for secondary pages (Dashboard, Daily archive) that were
+   not part of the Cosmic Arcade redesign. These map the old sci-fi helper
+   classes onto the new design language so those pages stay coherent. */
+.font-orbitron {
+  font-family: "Baloo 2", sans-serif;
+}
+.font-space-mono {
+  font-family: "Space Grotesk", sans-serif;
+}
+.mission-label {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9aa3d0;
+}
 .corner-bracket {
   position: relative;
 }
-.corner-bracket::before,
-.corner-bracket::after {
-  content: '';
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  border-color: #FF6B1A;
-  border-style: solid;
-}
-.corner-bracket::before {
-  top: -1px;
-  left: -1px;
-  border-width: 2px 0 0 2px;
-}
-.corner-bracket::after {
-  bottom: -1px;
-  right: -1px;
-  border-width: 0 2px 2px 0;
-}
-
-/* Orange glow effect */
 .glow-orange {
-  box-shadow: 0 0 20px rgba(255, 107, 26, 0.4);
+  box-shadow: 0 0 24px rgba(255, 133, 82, 0.35);
 }
 .glow-cyan {
-  box-shadow: 0 0 20px rgba(0, 255, 229, 0.4);
+  box-shadow: 0 0 24px rgba(87, 230, 210, 0.35);
 }
 .text-glow-orange {
-  text-shadow: 0 0 30px rgba(255, 107, 26, 0.6);
+  text-shadow: 0 0 24px rgba(255, 133, 82, 0.4);
 }
 
-/* Mission label style */
-.mission-label {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: #8B97C8;
+/* Hide scrollbars where the design wants clean edges */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
-
-/* Scanline overlay for retro feel */
-.scanlines {
-  position: relative;
-}
-.scanlines::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.03) 2px,
-    rgba(0, 0, 0, 0.03) 4px
-  );
-  pointer-events: none;
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

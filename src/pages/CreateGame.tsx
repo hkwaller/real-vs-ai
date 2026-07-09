@@ -3,12 +3,44 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '@clerk/react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import GameLayout from '@/components/GameLayout'
-import { Loader2, Clock, Images, Play, Eye, EyeOff, Gift, Rocket } from 'lucide-react'
+import { Loader2, Minus, Plus, Gift } from 'lucide-react'
 
 const FREE_GAME_LIMIT = 3
 const GAMES_CREATED_KEY = 'rvai_games_created'
+
+const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n))
+
+const Stepper: React.FC<{
+  value: number
+  onChange: (n: number) => void
+  min: number
+  max: number
+}> = ({ value, onChange, min, max }) => (
+  <div className="flex items-center gap-3">
+    <button
+      type="button"
+      onClick={() => onChange(clamp(value - 1, min, max))}
+      className="w-11 h-11 rounded-[14px] bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#FFF8F0] transition-colors disabled:opacity-40"
+      disabled={value <= min}
+      aria-label="Decrease"
+    >
+      <Minus className="w-5 h-5" />
+    </button>
+    <span className="font-display font-extrabold text-[28px] text-[#FFF8F0] w-12 text-center tabular-nums">
+      {value}
+    </span>
+    <button
+      type="button"
+      onClick={() => onChange(clamp(value + 1, min, max))}
+      className="w-11 h-11 rounded-[14px] bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#FFF8F0] transition-colors disabled:opacity-40"
+      disabled={value >= max}
+      aria-label="Increase"
+    >
+      <Plus className="w-5 h-5" />
+    </button>
+  </div>
+)
 
 const CreateGame: React.FC = () => {
   const navigate = useNavigate()
@@ -18,32 +50,22 @@ const CreateGame: React.FC = () => {
   const atFreeLimit = !isSignedIn && gamesCreated >= FREE_GAME_LIMIT
 
   const [loading, setLoading] = useState(false)
-  const [rounds, setRounds] = useState<number | string>(10)
-  const [timeLimit, setTimeLimit] = useState<number | string>(15)
+  const [rounds, setRounds] = useState(10)
+  const [timeLimit, setTimeLimit] = useState(15)
   const [revealMode, setRevealMode] = useState<'instant' | 'after_round'>('instant')
 
   const generateGameCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     let code = ''
-    for (let i = 0; i < 4; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
+    for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length))
     return code
   }
 
   const handleCreateGame = () => {
     setLoading(true)
-    if (!isSignedIn) {
-      localStorage.setItem(GAMES_CREATED_KEY, String(gamesCreated + 1))
-    }
+    if (!isSignedIn) localStorage.setItem(GAMES_CREATED_KEY, String(gamesCreated + 1))
     const code = generateGameCode()
-    navigate(`/lobby/${code}`, {
-      state: {
-        rounds: Number(rounds),
-        timeLimit: Number(timeLimit),
-        revealMode,
-      },
-    })
+    navigate(`/lobby/${code}`, { state: { rounds, timeLimit, revealMode } })
   }
 
   if (atFreeLimit) {
@@ -52,34 +74,32 @@ const CreateGame: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md mx-auto"
+          className="w-full max-w-[460px] mx-auto"
         >
-          <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-8 text-center space-y-6">
-            <div className="w-16 h-16 border-2 border-[#FFB830] flex items-center justify-center mx-auto">
-              <Gift className="w-8 h-8 text-[#FFB830]" />
+          <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-8 text-center space-y-6">
+            <div className="w-16 h-16 rounded-[20px] bg-[#FFC94D]/15 flex items-center justify-center mx-auto">
+              <Gift className="w-8 h-8 text-[#FFC94D]" />
             </div>
             <div>
-              <p className="mission-label mb-2">Access Denied</p>
-              <h2 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase">
-                Free Missions Used
+              <h2 className="font-display font-extrabold text-2xl text-[#FFF8F0]">
+                You've used your free games
               </h2>
-              <p className="text-[#8B97C8] text-sm mt-3">
-                You've completed your {FREE_GAME_LIMIT} free missions. Create a free account to
-                continue — or go Pro to remove ads.
+              <p className="text-[#9AA3D0] text-sm mt-3">
+                Create a free account to keep the parties going — or go Pro to remove ads.
               </p>
             </div>
             <div className="space-y-3">
               <Button size="lg" className="w-full" onClick={() => navigate('/sign-up')}>
-                Create Free Account
+                Create free account
               </Button>
-              <Button variant="outline" size="lg" className="w-full" onClick={() => navigate('/dashboard')}>
-                View Pro Plans
+              <Button variant="ghost" size="lg" className="w-full" onClick={() => navigate('/dashboard')}>
+                View Pro plans
               </Button>
               <button
                 onClick={() => navigate('/')}
-                className="font-space-mono text-xs text-[#8B97C8] hover:text-[#F5F0E8] transition-colors"
+                className="font-body text-sm text-[#6E77A8] hover:text-[#FFF8F0] transition-colors"
               >
-                ← Return to base
+                ← Back home
               </button>
             </div>
           </div>
@@ -93,105 +113,76 @@ const CreateGame: React.FC = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md mx-auto"
+        className="w-full max-w-[460px] mx-auto"
       >
-        <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-8 space-y-8">
-          <div>
-            <p className="mission-label mb-2">Setup</p>
-            <h1 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase tracking-wide">
-              Mission Config
-            </h1>
-            <p className="text-[#8B97C8] text-sm mt-1">Configure your game parameters</p>
-          </div>
-
-          <div className="space-y-6">
-            {/* Rounds */}
-            <div className="space-y-2">
-              <label className="mission-label flex items-center gap-2">
-                <Images className="w-3 h-3" />
-                Rounds
-              </label>
-              <Input
-                type="number"
-                min="1"
-                max="20"
-                value={rounds}
-                onChange={(e) => setRounds(e.target.value)}
-                className="bg-[#0B0F2E] border-[#2A3468] text-[#F5F0E8] font-space-mono text-lg focus:border-[#FF6B1A] focus:ring-[#FF6B1A]/20 h-12"
-              />
-            </div>
-
-            {/* Time limit */}
-            <div className="space-y-2">
-              <label className="mission-label flex items-center gap-2">
-                <Clock className="w-3 h-3" />
-                Time Per Round (seconds)
-              </label>
-              <Input
-                type="number"
-                min="5"
-                max="60"
-                value={timeLimit}
-                onChange={(e) => setTimeLimit(e.target.value)}
-                className="bg-[#0B0F2E] border-[#2A3468] text-[#F5F0E8] font-space-mono text-lg focus:border-[#FF6B1A] focus:ring-[#FF6B1A]/20 h-12"
-              />
-            </div>
-
-            {/* Reveal mode */}
-            <div className="space-y-2">
-              <label className="mission-label flex items-center gap-2">
-                {revealMode === 'instant' ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                Reveal Mode
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRevealMode('instant')}
-                  className={`py-3 px-4 text-xs font-orbitron font-bold uppercase tracking-widest transition-all border ${
-                    revealMode === 'instant'
-                      ? 'bg-[#FF6B1A] text-[#0B0F2E] border-[#FF6B1A] shadow-[0_0_15px_rgba(255,107,26,0.3)]'
-                      : 'bg-transparent text-[#8B97C8] border-[#2A3468] hover:border-[#FF6B1A] hover:text-[#FF6B1A]'
-                  }`}
-                >
-                  Instantly
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRevealMode('after_round')}
-                  className={`py-3 px-4 text-xs font-orbitron font-bold uppercase tracking-widest transition-all border ${
-                    revealMode === 'after_round'
-                      ? 'bg-[#FF6B1A] text-[#0B0F2E] border-[#FF6B1A] shadow-[0_0_15px_rgba(255,107,26,0.3)]'
-                      : 'bg-transparent text-[#8B97C8] border-[#2A3468] hover:border-[#FF6B1A] hover:text-[#FF6B1A]'
-                  }`}
-                >
-                  After Round
-                </button>
-              </div>
-              <p className="font-space-mono text-xs text-[#8B97C8]">
-                // {revealMode === 'instant' ? 'Votes are shown as they happen.' : 'Votes are hidden until round ends.'}
-              </p>
-            </div>
-          </div>
-
-          <Button
-            size="lg"
-            className="w-full"
-            onClick={handleCreateGame}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Initializing...
-              </>
-            ) : (
-              <>
-                <Rocket className="mr-2 h-4 w-4" />
-                Initialize Mission
-              </>
-            )}
-          </Button>
+        <div className="text-center mb-8">
+          <h1 className="font-display font-extrabold text-4xl text-[#FFF8F0]">Set up your party</h1>
+          <p className="text-[#9AA3D0] mt-2">Two knobs and you're off</p>
         </div>
+
+        <div className="rounded-[24px] border border-white/[0.07] bg-[#1F2450] p-6">
+          {/* Rounds */}
+          <div className="flex items-center justify-between py-5">
+            <div>
+              <p className="font-display font-bold text-[#FFF8F0]">Rounds</p>
+              <p className="text-[#9AA3D0] text-sm">How many photo pairs</p>
+            </div>
+            <Stepper value={rounds} onChange={setRounds} min={1} max={20} />
+          </div>
+
+          <div className="h-px bg-white/[0.07]" />
+
+          {/* Seconds per round */}
+          <div className="flex items-center justify-between py-5">
+            <div>
+              <p className="font-display font-bold text-[#FFF8F0]">Seconds per round</p>
+              <p className="text-[#9AA3D0] text-sm">Faster = more chaos</p>
+            </div>
+            <Stepper value={timeLimit} onChange={setTimeLimit} min={5} max={60} />
+          </div>
+
+          <div className="h-px bg-white/[0.07]" />
+
+          {/* Show votes */}
+          <div className="py-5">
+            <p className="font-display font-bold text-[#FFF8F0] mb-3">Show votes</p>
+            <div className="grid grid-cols-2 gap-2 rounded-[16px] bg-white/5 p-1">
+              {(
+                [
+                  { mode: 'instant', label: 'Live 👀' },
+                  { mode: 'after_round', label: 'At the end 🤫' },
+                ] as const
+              ).map(({ mode, label }) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setRevealMode(mode)}
+                  className={`h-11 rounded-[12px] font-display font-bold text-sm transition-all ${
+                    revealMode === mode
+                      ? 'bg-[#57E6D2] text-[#151936]'
+                      : 'text-[#9AA3D0] hover:text-[#FFF8F0]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[#9AA3D0] text-sm mt-3">
+              Live shows everyone's picks as they happen
+            </p>
+          </div>
+        </div>
+
+        <Button size="lg" className="w-full mt-6" onClick={handleCreateGame} disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Creating…
+            </>
+          ) : (
+            'Create party 🎉'
+          )}
+        </Button>
       </motion.div>
     </GameLayout>
   )
