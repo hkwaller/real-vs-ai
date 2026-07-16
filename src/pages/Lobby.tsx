@@ -15,6 +15,7 @@ import {
   LiveMap,
   LiveObject,
 } from '@/liveblocks.config';
+import { useAdFree } from '@/hooks/useAdFree';
 
 interface GameSettings {
   rounds: number;
@@ -51,9 +52,16 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
     writeSettings(settings);
   }, [isReady]);
 
-  const startGame = useMutation(({ storage }) => {
-    storage.get('gameStatus').set('value', 'playing');
-  }, []);
+  // Host perk: stamp the host's ad-free status into the room so in-game ads are
+  // suppressed for everyone when the host is ad-free.
+  const { isAdFree: hostIsAdFree } = useAdFree();
+  const startGame = useMutation(
+    ({ storage }, hostAdFree: boolean) => {
+      storage.set('hostAdFree', hostAdFree);
+      storage.get('gameStatus').set('value', 'playing');
+    },
+    [],
+  );
 
   const joinUrl = `${window.location.origin}/join?code=${code}`;
 
@@ -65,7 +73,7 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
 
   const handleStart = () => {
     if (!isReady) return;
-    startGame();
+    startGame(hostIsAdFree);
     navigate(`/game/${code}`);
   };
 
@@ -196,6 +204,7 @@ const Lobby: React.FC = () => {
         votes: new LiveMap(),
         scores: new LiveMap(),
         players: new LiveList([]),
+        hostAdFree: false,
       }}
     >
       <LobbyContent code={code} settings={settings} />

@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import GameLayout from '@/components/GameLayout'
 import CountdownRing from '@/components/CountdownRing'
+import AdsterraBanner from '@/components/AdsterraBanner'
+import AdsterraPopunder from '@/components/AdsterraPopunder'
+import { useInGameAdsSuppressed } from '@/hooks/useInGameAdsSuppressed'
 import { Loader2 } from 'lucide-react'
 import {
   RoomProvider,
@@ -41,6 +44,10 @@ const PlayerGameContent: React.FC<{
   const roundStartTimeRef = useRef<number>(Date.now())
 
   const updatePresence = useUpdateMyPresence()
+
+  // Host perk + local entitlement. Player devices get the popunder on the
+  // end screen (never the shared host display).
+  const adsSuppressed = useInGameAdsSuppressed()
 
   const gameStatus = useStorage((root) => root.gameStatus?.value ?? null)
   const currentRoundIndexObj = useStorage((root) => root.currentRoundIndex)
@@ -141,6 +148,8 @@ const PlayerGameContent: React.FC<{
             Back home
           </Button>
         </div>
+        <AdsterraBanner suppressed={adsSuppressed} />
+        <AdsterraPopunder suppressed={adsSuppressed} />
       </GameLayout>
     )
   }
@@ -160,6 +169,7 @@ const PlayerGameContent: React.FC<{
             ← Wrong code? Go back
           </button>
         </div>
+        <AdsterraBanner suppressed={adsSuppressed} />
       </GameLayout>
     )
   }
@@ -380,6 +390,7 @@ const PlayerGame: React.FC = () => {
         votes: new LiveMap(),
         scores: new LiveMap(),
         players: new LiveList([]),
+        hostAdFree: false,
       }}
     >
       <PlayerGameContent playerId={playerId} playerName={playerName} playerEmoji={playerEmoji} />

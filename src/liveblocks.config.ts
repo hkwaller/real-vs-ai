@@ -28,6 +28,9 @@ export type Storage = {
   votes: LiveMap<string, "A" | "B">;
   scores: LiveMap<string, number>;
   players: LiveList<{ id: string; name: string; emoji: string }>;
+  // Host perk: true when the device that started the game is ad-free, which
+  // suppresses in-game ads for everyone in the room. Stamped at game start.
+  hostAdFree: boolean;
 };
 
 type RoomEvent =

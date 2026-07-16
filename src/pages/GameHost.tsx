@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useAuth, useUser } from '@clerk/react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -12,7 +11,8 @@ import {
 } from '@/components/ui/dialog'
 import GameLayout from '@/components/GameLayout'
 import CountdownRing from '@/components/CountdownRing'
-import AdBanner from '@/components/AdBanner'
+import AdsterraBanner from '@/components/AdsterraBanner'
+import { useInGameAdsSuppressed } from '@/hooks/useInGameAdsSuppressed'
 import { supabase } from '@/lib/supabase'
 import { Users, UserX, X, Loader2 } from 'lucide-react'
 import confetti from 'canvas-confetti'
@@ -40,12 +40,9 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const [confirmKickId, setConfirmKickId] = useState<string | null>(null)
   const [isReplacing, setIsReplacing] = useState(false)
 
-  const { isSignedIn } = useAuth()
-  const { user } = useUser()
-  const isSubscribed =
-    (user?.publicMetadata as { subscriptionStatus?: string } | undefined)?.subscriptionStatus ===
-    'active'
-  const showAds = !!isSignedIn && !isSubscribed
+  // In-game ads: hidden if the host started the game ad-free (host perk) or if
+  // this viewer is ad-free. The banner also self-gates on the local entitlement.
+  const adsSuppressed = useInGameAdsSuppressed()
 
   const status = useStatus()
 
@@ -130,6 +127,8 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     }
     storage.get('currentRoundIndex').set('value', 0)
     storage.get('gameStatus').set('value', 'waiting')
+    // Clear the host perk so a rematch re-stamps it from the host at next start.
+    storage.set('hostAdFree', false)
   }, [])
 
   const replaceRound = useMutation(
@@ -484,6 +483,9 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
             Back home
           </Button>
         </div>
+        {/* Results screen — banner allowed. Popunder is player-device only, not
+            fired on this shared host display. */}
+        <AdsterraBanner suppressed={adsSuppressed} />
       </GameLayout>
     )
   }
@@ -669,7 +671,8 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
             </Button>
           </div>
         </div>
-        {showAds && <AdBanner />}
+        {/* Between-rounds reveal — safe to show a banner here. */}
+        <AdsterraBanner suppressed={adsSuppressed} />
       </GameLayout>
     )
   }
@@ -747,7 +750,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
           />
         ))}
       </div>
-      {showAds && <AdBanner />}
+      {/* No banner on the active round view — never advertise during answering. */}
     </GameLayout>
   )
 }
@@ -777,6 +780,7 @@ const GameHost: React.FC = () => {
         votes: new LiveMap(),
         scores: new LiveMap(),
         players: new LiveList([]),
+        hostAdFree: false,
       }}
     >
       <GameHostContent code={code} />
