@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import GameLayout from '@/components/GameLayout'
+import Seo from '@/components/Seo'
 import { Loader2, Calendar, Trophy, Home, Play, CheckCircle2, XCircle } from 'lucide-react'
 import {
   fetchSchedule,
@@ -64,6 +65,11 @@ const DailyChallengeArchive: React.FC = () => {
   if (loading) {
     return (
       <GameLayout>
+        <Seo
+          title="Daily Challenge Archive — Real or AI"
+          description="Browse and replay every past Real-or-AI daily challenge. See if you can still spot the AI-generated photo."
+          path="/daily/archive"
+        />
         <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-10 max-w-sm mx-auto text-center space-y-4">
           <Loader2 className="w-10 h-10 text-[#FFB830] mx-auto animate-spin" />
           <div>
@@ -81,6 +87,11 @@ const DailyChallengeArchive: React.FC = () => {
 
   return (
     <GameLayout>
+      <Seo
+        title="Daily Challenge Archive — Real or AI"
+        description="Browse and replay every past Real-or-AI daily challenge. See if you can still spot the AI-generated photo."
+        path="/daily/archive"
+      />
       <div className="flex flex-col items-center gap-6 w-full">
         {/* Header */}
         <div className="text-center w-full">

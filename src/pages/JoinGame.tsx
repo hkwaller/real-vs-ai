@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import GameLayout from '@/components/GameLayout'
+import Seo from '@/components/Seo'
 import { Loader2 } from 'lucide-react'
 
 const EMOJIS = [
@@ -81,6 +82,7 @@ const JoinGame: React.FC = () => {
 
   return (
     <GameLayout>
+      <Seo title="Join a game — Real or AI" path="/join" noindex />
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}

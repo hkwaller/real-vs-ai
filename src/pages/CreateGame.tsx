@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '@clerk/react'
 import { Button } from '@/components/ui/button'
 import GameLayout from '@/components/GameLayout'
+import Seo from '@/components/Seo'
 import { Loader2, Minus, Plus, Gift } from 'lucide-react'
 
 const FREE_GAME_LIMIT = 3
@@ -71,6 +72,7 @@ const CreateGame: React.FC = () => {
   if (atFreeLimit) {
     return (
       <GameLayout>
+        <Seo title="Create a game — Real or AI" path="/create" noindex />
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -110,6 +112,7 @@ const CreateGame: React.FC = () => {
 
   return (
     <GameLayout>
+      <Seo title="Create a game — Real or AI" path="/create" noindex />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

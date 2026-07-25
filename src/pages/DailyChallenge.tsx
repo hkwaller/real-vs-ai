@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import GameLayout from '@/components/GameLayout'
+import Seo from '@/components/Seo'
 import { Loader2, ZoomIn, X } from 'lucide-react'
 import {
   getTodayDate,
@@ -52,6 +53,14 @@ const DailyChallenge: React.FC = () => {
 
   const date = dateParam ?? getTodayDate()
   const isToday = date === getTodayDate()
+
+  const seoPath = isToday ? '/daily' : `/daily/${date}`
+  const seoTitle = isToday
+    ? 'Daily Challenge — Real or AI'
+    : `Daily Challenge · ${date} — Real or AI`
+  const seoDescription =
+    'A fresh Real-or-AI puzzle every day. Two photos, one is AI-generated — spot the fake in 15 seconds and keep your streak alive.'
+  const seo = <Seo title={seoTitle} description={seoDescription} path={seoPath} />
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [rounds, setRounds] = useState<DailyRound[]>([])
@@ -163,6 +172,7 @@ const DailyChallenge: React.FC = () => {
   if (phase === 'loading') {
     return (
       <GameLayout>
+        {seo}
         <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-10 max-w-sm mx-auto text-center space-y-4">
           <Loader2 className="w-10 h-10 text-[#57E6D2] mx-auto animate-spin" />
           <h1 className="font-display font-extrabold text-2xl text-[#FFF8F0]">Loading today's five…</h1>
@@ -175,6 +185,7 @@ const DailyChallenge: React.FC = () => {
   if (phase === 'no_challenge') {
     return (
       <GameLayout>
+        {seo}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -205,6 +216,7 @@ const DailyChallenge: React.FC = () => {
 
     return (
       <GameLayout>
+        {seo}
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -336,6 +348,7 @@ const DailyChallenge: React.FC = () => {
 
   return (
     <GameLayout className="max-w-5xl">
+      {seo}
       {/* Top strip */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <span className="font-body font-semibold text-sm text-[#FFF8F0]">

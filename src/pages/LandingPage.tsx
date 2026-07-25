@@ -4,6 +4,7 @@ import { motion, Variants } from 'framer-motion'
 import { useAuth, UserButton } from '@clerk/react'
 import { Button } from '@/components/ui/button'
 import GameLayout from '@/components/GameLayout'
+import Seo from '@/components/Seo'
 import DailyChallengeCard from '@/components/DailyChallengeCard'
 import { LayoutDashboard } from 'lucide-react'
 
@@ -98,6 +99,10 @@ const LandingPage: React.FC = () => {
 
   return (
     <GameLayout className="max-w-6xl">
+      <Seo
+        title="Real or AI — Spot the fake. Beat your friends."
+        path="/"
+      />
       {/* Header */}
       {isLoaded && (
         <div className="flex items-center justify-between mb-10">

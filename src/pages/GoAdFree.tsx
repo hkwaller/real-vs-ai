@@ -4,6 +4,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import GameLayout from '@/components/GameLayout'
+import Seo from '@/components/Seo'
 import { cn } from '@/lib/utils'
 import { isAdFree, adFreeUntilDate, type AdFreePublicMetadata } from '@/lib/entitlement'
 import { Check, Loader2, Sparkles, ShieldCheck } from 'lucide-react'
@@ -124,6 +125,11 @@ const GoAdFree: React.FC = () => {
 
   return (
     <GameLayout className="max-w-4xl">
+      <Seo
+        title="Go Ad-Free — Real or AI"
+        description="Remove ads and support Real or AI. Get an ad-free pass and enjoy uninterrupted rounds of spotting the fake."
+        path="/go-ad-free"
+      />
       <div className="space-y-8 py-4">
         {/* Header */}
         <motion.div
