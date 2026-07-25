@@ -72,7 +72,7 @@ const CreateGame: React.FC = () => {
   if (atFreeLimit) {
     return (
       <GameLayout>
-        <Seo title="Create a game — Real or AI" path="/create" noindex />
+        <Seo title="Create a game - Real or AI" path="/create" noindex />
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -87,14 +87,19 @@ const CreateGame: React.FC = () => {
                 You've used your free games
               </h2>
               <p className="text-[#9AA3D0] text-sm mt-3">
-                Create a free account to keep the parties going — or go Pro to remove ads.
+                Create a free account to keep the parties going - or go Pro to remove ads.
               </p>
             </div>
             <div className="space-y-3">
               <Button size="lg" className="w-full" onClick={() => navigate('/sign-up')}>
                 Create free account
               </Button>
-              <Button variant="ghost" size="lg" className="w-full" onClick={() => navigate('/dashboard')}>
+              <Button
+                variant="ghost"
+                size="lg"
+                className="w-full"
+                onClick={() => navigate('/dashboard')}
+              >
                 View Pro plans
               </Button>
               <button
@@ -112,7 +117,7 @@ const CreateGame: React.FC = () => {
 
   return (
     <GameLayout>
-      <Seo title="Create a game — Real or AI" path="/create" noindex />
+      <Seo title="Create a game - Real or AI" path="/create" noindex />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

@@ -8,13 +8,48 @@ import Seo from '@/components/Seo'
 import { Loader2 } from 'lucide-react'
 
 const EMOJIS = [
-  '🦊', '😎', '👾', '💀', '🥱', '🦄',
-  '👽', '🐼', '🐸', '🦖', '🐙', '🤖',
-  '😀', '👻', '🐱', '🐶', '🦁', '🐲',
-  '😇', '🤩', '🥳', '🤯', '🤠', '🤡',
-  '😈', '👹', '👺', '🙈', '🐻', '🐨',
-  '🐯', '🐷', '🐔', '🐧', '🦉', '🦋',
-  '🐢', '🐍', '🐳', '🐬', '🐉', '🧚',
+  '🦊',
+  '😎',
+  '👾',
+  '💀',
+  '🥱',
+  '🦄',
+  '👽',
+  '🐼',
+  '🐸',
+  '🦖',
+  '🐙',
+  '🤖',
+  '😀',
+  '👻',
+  '🐱',
+  '🐶',
+  '🦁',
+  '🐲',
+  '😇',
+  '🤩',
+  '🥳',
+  '🤯',
+  '🤠',
+  '🤡',
+  '😈',
+  '👹',
+  '👺',
+  '🙈',
+  '🐻',
+  '🐨',
+  '🐯',
+  '🐷',
+  '🐔',
+  '🐧',
+  '🦉',
+  '🦋',
+  '🐢',
+  '🐍',
+  '🐳',
+  '🐬',
+  '🐉',
+  '🧚',
 ]
 
 const CODE_LEN = 4
@@ -44,7 +79,10 @@ const JoinGame: React.FC = () => {
   const valid = code.length === CODE_LEN && name.trim().length > 0
 
   const handleCell = (index: number, raw: string) => {
-    const char = raw.slice(-1).toUpperCase().replace(/[^A-Z0-9]/g, '')
+    const char = raw
+      .slice(-1)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
     setCells((prev) => {
       const next = [...prev]
       next[index] = char
@@ -61,7 +99,11 @@ const JoinGame: React.FC = () => {
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault()
-    const text = e.clipboardData.getData('text').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LEN)
+    const text = e.clipboardData
+      .getData('text')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, CODE_LEN)
     if (!text) return
     const arr = Array(CODE_LEN).fill('')
     for (let i = 0; i < text.length; i++) arr[i] = text[i]
@@ -74,7 +116,10 @@ const JoinGame: React.FC = () => {
     setLoading(true)
     const resolvedEmoji = selectedEmoji ?? EMOJIS[Math.floor(Math.random() * EMOJIS.length)]
     const playerId = crypto.randomUUID()
-    localStorage.setItem(`rvai_player_${playerId}`, JSON.stringify({ name: name.trim(), emoji: resolvedEmoji }))
+    localStorage.setItem(
+      `rvai_player_${playerId}`,
+      JSON.stringify({ name: name.trim(), emoji: resolvedEmoji }),
+    )
     navigate(`/play/${code}?pid=${playerId}`)
   }
 
@@ -82,7 +127,7 @@ const JoinGame: React.FC = () => {
 
   return (
     <GameLayout>
-      <Seo title="Join a game — Real or AI" path="/join" noindex />
+      <Seo title="Join a game - Real or AI" path="/join" noindex />
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -116,11 +161,20 @@ const JoinGame: React.FC = () => {
         </div>
 
         {/* Name */}
-        <label className="font-body font-semibold text-sm text-[#9AA3D0] block mt-6 mb-2">Your name</label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={12} placeholder="Maya" />
+        <label className="font-body font-semibold text-sm text-[#9AA3D0] block mt-6 mb-2">
+          Your name
+        </label>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={12}
+          placeholder="Maya"
+        />
 
         {/* Face picker */}
-        <label className="font-body font-semibold text-sm text-[#9AA3D0] block mt-6 mb-2">Pick your face</label>
+        <label className="font-body font-semibold text-sm text-[#9AA3D0] block mt-6 mb-2">
+          Pick your face
+        </label>
         <div className="grid grid-cols-6 gap-2">
           {visibleFaces.map((emoji) => (
             <button

@@ -79,7 +79,7 @@ const PlayerGameContent: React.FC<{
     registerPlayer()
   }, [gameStatus, registered])
 
-  // Countdown — resets when round changes
+  // Countdown - resets when round changes
   useEffect(() => {
     roundStartTimeRef.current = Date.now()
     setTimeRemaining(timeLimit)
@@ -160,7 +160,9 @@ const PlayerGameContent: React.FC<{
       <GameLayout>
         <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-10 max-w-sm mx-auto text-center space-y-4">
           <Loader2 className="w-10 h-10 text-[#FF8552] mx-auto animate-spin" />
-          <h1 className="font-display font-extrabold text-2xl text-[#FFF8F0]">Get ready, {playerName}</h1>
+          <h1 className="font-display font-extrabold text-2xl text-[#FFF8F0]">
+            Get ready, {playerName}
+          </h1>
           <p className="text-[#9AA3D0] text-sm">Waiting for the host to start…</p>
           <button
             onClick={() => navigate('/join')}
@@ -208,13 +210,14 @@ const PlayerGameContent: React.FC<{
             {playerEmoji}
           </div>
 
-          <h1 className="font-display font-extrabold text-[38px] leading-none" style={{ color: ringColor }}>
+          <h1
+            className="font-display font-extrabold text-[38px] leading-none"
+            style={{ color: ringColor }}
+          >
             {correct ? 'Nailed it!' : 'Fooled!'}
           </h1>
           <p className="text-[#9AA3D0] mt-3">
-            {correct
-              ? `${roundResult.correctChoice} was the real photo`
-              : 'That one was AI-made'}
+            {correct ? `${roundResult.correctChoice} was the real photo` : 'That one was AI-made'}
           </p>
 
           {correct && roundResult.points > 0 && (
@@ -228,7 +231,7 @@ const PlayerGameContent: React.FC<{
           {correct && streak >= 2 && (
             <div className="mt-4 rounded-full bg-white/5 px-4 py-2">
               <span className="font-body font-semibold text-sm text-[#FFF8F0]">
-                🔥 {streak} in a row — keep it up
+                🔥 {streak} in a row - keep it up
               </span>
             </div>
           )}
@@ -276,9 +279,11 @@ const PlayerGameContent: React.FC<{
               <CountdownRing value={timeRemaining} total={timeLimit} size={120} showCaption />
 
               <div className="text-center">
-                <h2 className="font-display font-extrabold text-2xl text-[#FFF8F0]">Which one's real?</h2>
+                <h2 className="font-display font-extrabold text-2xl text-[#FFF8F0]">
+                  Which one's real?
+                </h2>
                 <p className="text-[#9AA3D0] text-sm mt-1">
-                  Look at the big screen — faster answers score more
+                  Look at the big screen - faster answers score more
                 </p>
               </div>
 

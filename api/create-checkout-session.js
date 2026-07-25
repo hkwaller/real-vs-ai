@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     const clerkUser = await clerk.users.getUser(userId)
     customerId = clerkUser.privateMetadata?.stripeCustomerId
   } catch {
-    // ignore — fall through to email lookup / create
+    // ignore - fall through to email lookup / create
   }
 
   if (!customerId) {

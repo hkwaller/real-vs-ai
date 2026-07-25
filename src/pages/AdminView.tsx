@@ -464,7 +464,7 @@ const AdminView: React.FC = () => {
   const usedInOtherDays = new Set(
     Object.entries(schedule)
       .filter(([date]) => date !== selectedDate)
-      .flatMap(([, entry]) => Array.isArray(entry?.images) ? entry.images : []),
+      .flatMap(([, entry]) => (Array.isArray(entry?.images) ? entry.images : [])),
   )
 
   return (
@@ -541,7 +541,7 @@ const AdminView: React.FC = () => {
                         </Button>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Use the direct image URL — right-click → <em>Copy Image Address</em> on
+                        Use the direct image URL - right-click → <em>Copy Image Address</em> on
                         Unsplash. Unsplash images are auto-cropped by subject.
                       </p>
                     </div>
@@ -562,14 +562,14 @@ const AdminView: React.FC = () => {
                           />
                         </div>
                         <p className="text-xs text-muted-foreground text-center">
-                          1024×1024 — looks good? Hit Send to n8n.
+                          1024×1024 - looks good? Hit Send to n8n.
                         </p>
                       </div>
                     )}
 
                     {uploadStatus === 'success' && (
                       <div className="p-3 bg-green-500/10 border border-green-500/20 rounded text-green-400 text-xs space-y-2">
-                        <div className="font-bold">Prompt returned — use this in Gemini:</div>
+                        <div className="font-bold">Prompt returned - use this in Gemini:</div>
                         <div
                           className="bg-slate-900/50 p-2 rounded font-mono break-words cursor-pointer hover:bg-slate-900/80 transition-colors select-all"
                           title="Click to select all"
@@ -591,7 +591,7 @@ const AdminView: React.FC = () => {
 
                     {uploadStatus === 'error' && (
                       <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-xs text-center">
-                        Pipeline failed — check n8n.
+                        Pipeline failed - check n8n.
                       </div>
                     )}
                   </CardContent>
@@ -904,8 +904,12 @@ const AdminView: React.FC = () => {
                                         : 'border-white/10 hover:border-white/20 cursor-pointer'
                                   }`}
                                 >
-                                  <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${checked ? 'bg-amber-500 border-amber-500' : 'border-white/30'}`}>
-                                    {checked && <span className="text-black text-[10px] font-bold">✓</span>}
+                                  <div
+                                    className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${checked ? 'bg-amber-500 border-amber-500' : 'border-white/30'}`}
+                                  >
+                                    {checked && (
+                                      <span className="text-black text-[10px] font-bold">✓</span>
+                                    )}
                                   </div>
                                   <img
                                     src={img.realUrl}
@@ -1110,22 +1114,41 @@ const AdminView: React.FC = () => {
                                       <div className="flex gap-1 shrink-0">
                                         <div className="w-12 h-12 rounded overflow-hidden bg-black/30 border border-indigo-500/20">
                                           <img
-                                            src={pair?.realUrl ?? supabase.storage.from('real-vs-ai').getPublicUrl(`real/${filename}`).data.publicUrl}
+                                            src={
+                                              pair?.realUrl ??
+                                              supabase.storage
+                                                .from('real-vs-ai')
+                                                .getPublicUrl(`real/${filename}`).data.publicUrl
+                                            }
                                             alt={`real ${filename}`}
                                             className="w-full h-full object-cover"
-                                            onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/48x48?text=?' }}
+                                            onError={(e) => {
+                                              ;(e.target as HTMLImageElement).src =
+                                                'https://placehold.co/48x48?text=?'
+                                            }}
                                           />
                                         </div>
                                         <div className="w-12 h-12 rounded overflow-hidden bg-black/30 border border-purple-500/20">
                                           <img
-                                            src={pair?.aiUrl ?? supabase.storage.from('real-vs-ai').getPublicUrl(`ai/${filename}`).data.publicUrl}
+                                            src={
+                                              pair?.aiUrl ??
+                                              supabase.storage
+                                                .from('real-vs-ai')
+                                                .getPublicUrl(`ai/${filename}`).data.publicUrl
+                                            }
                                             alt={`ai ${filename}`}
                                             className="w-full h-full object-cover"
-                                            onError={(e) => { (e.target as HTMLImageElement).src = 'https://placehold.co/48x48?text=?' }}
+                                            onError={(e) => {
+                                              ;(e.target as HTMLImageElement).src =
+                                                'https://placehold.co/48x48?text=?'
+                                            }}
                                           />
                                         </div>
                                       </div>
-                                      <span className="text-xs text-muted-foreground truncate flex-1 font-mono" title={filename}>
+                                      <span
+                                        className="text-xs text-muted-foreground truncate flex-1 font-mono"
+                                        title={filename}
+                                      >
                                         {filename}
                                       </span>
                                     </div>

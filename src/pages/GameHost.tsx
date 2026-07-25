@@ -242,7 +242,13 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   }
 
   useEffect(() => {
-    if (initRunningRef.current || status !== 'connected' || roundsStorage === null || settings === null) return
+    if (
+      initRunningRef.current ||
+      status !== 'connected' ||
+      roundsStorage === null ||
+      settings === null
+    )
+      return
 
     initRunningRef.current = true
     let cancelled = false
@@ -392,7 +398,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     )
   }
 
-  // Game over — podium
+  // Game over - podium
   if (gameStatus === 'finished') {
     const winner = players[0]
     const podiumRanks = [2, 1, 3]
@@ -432,12 +438,19 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                 <motion.div
                   initial={{ height: 0 }}
                   animate={{ height: podiumHeights[rank] }}
-                  transition={{ delay: 0.15 * (4 - rank), type: 'spring', stiffness: 120, damping: 16 }}
+                  transition={{
+                    delay: 0.15 * (4 - rank),
+                    type: 'spring',
+                    stiffness: 120,
+                    damping: 16,
+                  }}
                   className={`w-full rounded-t-[16px] flex flex-col items-center justify-center gap-1 ${podiumColor[rank]}`}
                   style={{ minHeight: 60 }}
                 >
                   <span className="font-display font-extrabold text-3xl leading-none">{rank}</span>
-                  <span className={`font-body font-semibold text-sm ${isWinner ? 'text-[#151936]/70' : 'text-[#6E77A8]'}`}>
+                  <span
+                    className={`font-body font-semibold text-sm ${isWinner ? 'text-[#151936]/70' : 'text-[#6E77A8]'}`}
+                  >
                     {p.score} pts
                   </span>
                 </motion.div>
@@ -457,7 +470,9 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                 <span className="font-display font-bold text-[#6E77A8] w-6">{i + 4}</span>
                 <span className="text-xl leading-none">{p.emoji}</span>
                 <span className="font-display font-bold text-[#FFF8F0]">{p.name}</span>
-                <span className="font-body font-semibold text-[#9AA3D0] ml-auto">{p.score} pts</span>
+                <span className="font-body font-semibold text-[#9AA3D0] ml-auto">
+                  {p.score} pts
+                </span>
               </div>
             ))}
           </div>
@@ -483,7 +498,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
             Back home
           </Button>
         </div>
-        {/* Results screen — banner allowed. Popunder is player-device only, not
+        {/* Results screen - banner allowed. Popunder is player-device only, not
             fired on this shared host display. */}
         <AdsterraBanner suppressed={adsSuppressed} />
       </GameLayout>
@@ -568,7 +583,12 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                   >
                     Kick
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setConfirmKickId(null)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 px-2"
+                    onClick={() => setConfirmKickId(null)}
+                  >
                     <X className="w-3 h-3" />
                   </Button>
                 </div>
@@ -589,14 +609,14 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     </Dialog>
   )
 
-  // Reveal view (3-column) — replaces the old blur-overlay modal.
+  // Reveal view (3-column) - replaces the old blur-overlay modal.
   if (showResult) {
     const winnerLetter = correctChoice
     return (
       <GameLayout className="max-w-6xl">
         <h1 className="text-center font-display font-extrabold text-[34px] md:text-[44px] text-[#FFF8F0] mb-6">
-          <span className="text-[#57E6D2]">{winnerLetter} was real!</span>{' '}
-          {correctCount} of {totalPlayers} got it 🎉
+          <span className="text-[#57E6D2]">{winnerLetter} was real!</span> {correctCount} of{' '}
+          {totalPlayers} got it 🎉
         </h1>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -648,7 +668,9 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                       isLeader ? 'bg-[#FFC94D]/12' : 'bg-white/5'
                     }`}
                   >
-                    <span className={`font-display font-extrabold w-5 ${isLeader ? 'text-[#FFC94D]' : 'text-[#6E77A8]'}`}>
+                    <span
+                      className={`font-display font-extrabold w-5 ${isLeader ? 'text-[#FFC94D]' : 'text-[#6E77A8]'}`}
+                    >
                       {rank}
                     </span>
                     <span className="text-xl leading-none">{p.emoji}</span>
@@ -659,7 +681,9 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                     {delta < 0 && (
                       <span className="font-body text-xs font-bold text-[#FF6A6A]">▼{-delta}</span>
                     )}
-                    <span className={`font-display font-extrabold ml-auto ${isLeader ? 'text-[#FFC94D]' : 'text-[#FFF8F0]'}`}>
+                    <span
+                      className={`font-display font-extrabold ml-auto ${isLeader ? 'text-[#FFC94D]' : 'text-[#FFF8F0]'}`}
+                    >
                       {p.score}
                     </span>
                   </motion.div>
@@ -671,7 +695,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
             </Button>
           </div>
         </div>
-        {/* Between-rounds reveal — safe to show a banner here. */}
+        {/* Between-rounds reveal - safe to show a banner here. */}
         <AdsterraBanner suppressed={adsSuppressed} />
       </GameLayout>
     )
@@ -684,7 +708,8 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <span className="font-display font-extrabold text-2xl text-[#FFF8F0]">
-            Round {currentRoundIndex + 1} <span className="text-[#9AA3D0]">of {settings?.rounds ?? '?'}</span>
+            Round {currentRoundIndex + 1}{' '}
+            <span className="text-[#9AA3D0]">of {settings?.rounds ?? '?'}</span>
           </span>
           <span className="rounded-full bg-white/5 px-3 py-1.5 font-body text-sm text-[#9AA3D0]">
             {votedCount} of {totalPlayers} voted
@@ -750,7 +775,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
           />
         ))}
       </div>
-      {/* No banner on the active round view — never advertise during answering. */}
+      {/* No banner on the active round view - never advertise during answering. */}
     </GameLayout>
   )
 }

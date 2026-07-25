@@ -4,7 +4,7 @@ import { createClerkClient } from '@clerk/backend'
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY })
 
-// Node runtime + raw body — a parsed body breaks signature verification.
+// Node runtime + raw body - a parsed body breaks signature verification.
 export const config = { api: { bodyParser: false } }
 
 async function getRawBody(req) {
@@ -97,8 +97,7 @@ export default async function handler(req, res) {
         const clerkUserId = await resolveClerkUserId(subscription)
         if (!clerkUserId) break
 
-        const isActive =
-          subscription.status === 'active' || subscription.status === 'trialing'
+        const isActive = subscription.status === 'active' || subscription.status === 'trialing'
         const priceId = subscription.items?.data?.[0]?.price?.id
         const plan = planFromPriceId(priceId)
 
@@ -111,7 +110,7 @@ export default async function handler(req, res) {
           }
           await patchPublicMetadata(clerkUserId, patch)
         } else {
-          // past_due / incomplete / canceled — stop marking active; existing
+          // past_due / incomplete / canceled - stop marking active; existing
           // adFreeUntil expires on its own.
           await patchPublicMetadata(clerkUserId, { subscriptionActive: false })
         }

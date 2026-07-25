@@ -54,7 +54,7 @@ const GoAdFree: React.FC = () => {
   const until = adFreeUntilDate(metadata)
   const subscriptionActive = !!metadata?.subscriptionActive
 
-  // After returning from Checkout, the webhook writes the entitlement async —
+  // After returning from Checkout, the webhook writes the entitlement async -
   // poll a few times so the page reflects it without a manual refresh.
   useEffect(() => {
     if (status !== 'success' || !user) return
@@ -126,7 +126,7 @@ const GoAdFree: React.FC = () => {
   return (
     <GameLayout className="max-w-4xl">
       <Seo
-        title="Go Ad-Free — Real or AI"
+        title="Go Ad-Free - Real or AI"
         description="Remove ads and support Real or AI. Get an ad-free pass and enjoy uninterrupted rounds of spotting the fake."
         path="/go-ad-free"
       />
@@ -145,7 +145,7 @@ const GoAdFree: React.FC = () => {
             Play without the ads
           </h1>
           <p className="text-[#9AA3D0] max-w-md mx-auto">
-            Pick a pass. Ads disappear instantly — and when you host, your whole room rides along.
+            Pick a pass. Ads disappear instantly - and when you host, your whole room rides along.
           </p>
         </motion.div>
 
@@ -204,7 +204,7 @@ const GoAdFree: React.FC = () => {
           </div>
         )}
 
-        {/* Tiers — hidden once ad-free unless a subscription might be upgraded */}
+        {/* Tiers - hidden once ad-free unless a subscription might be upgraded */}
         {!adFree && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -273,7 +273,7 @@ const GoAdFree: React.FC = () => {
 
             {!user && (
               <p className="text-center font-body text-sm text-[#6E77A8]">
-                Sign in required to purchase — it's how we tie the pass to your account.
+                Sign in required to purchase - it's how we tie the pass to your account.
               </p>
             )}
           </>

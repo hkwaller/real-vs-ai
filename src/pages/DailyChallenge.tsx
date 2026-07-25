@@ -56,10 +56,10 @@ const DailyChallenge: React.FC = () => {
 
   const seoPath = isToday ? '/daily' : `/daily/${date}`
   const seoTitle = isToday
-    ? 'Daily Challenge — Real or AI'
-    : `Daily Challenge · ${date} — Real or AI`
+    ? 'Daily Challenge - Real or AI'
+    : `Daily Challenge · ${date} - Real or AI`
   const seoDescription =
-    'A fresh Real-or-AI puzzle every day. Two photos, one is AI-generated — spot the fake in 15 seconds and keep your streak alive.'
+    'A fresh Real-or-AI puzzle every day. Two photos, one is AI-generated - spot the fake in 15 seconds and keep your streak alive.'
   const seo = <Seo title={seoTitle} description={seoDescription} path={seoPath} />
 
   const [phase, setPhase] = useState<Phase>('loading')
@@ -163,7 +163,7 @@ const DailyChallenge: React.FC = () => {
     const details = existingScore?.roundDetails ?? []
     const correct = details.filter((r) => r.correct).length
     const grid = details.map((r) => (r.correct ? '🟩' : '🟥')).join('')
-    const text = `Real vs AI — Today's five\n${correct}/${details.length} ${grid}\nCan you beat me? 🤖`
+    const text = `Real vs AI - Today's five\n${correct}/${details.length} ${grid}\nCan you beat me? 🤖`
     if (navigator.share) navigator.share({ text }).catch(() => {})
     else navigator.clipboard.writeText(text)
   }
@@ -175,7 +175,9 @@ const DailyChallenge: React.FC = () => {
         {seo}
         <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-10 max-w-sm mx-auto text-center space-y-4">
           <Loader2 className="w-10 h-10 text-[#57E6D2] mx-auto animate-spin" />
-          <h1 className="font-display font-extrabold text-2xl text-[#FFF8F0]">Loading today's five…</h1>
+          <h1 className="font-display font-extrabold text-2xl text-[#FFF8F0]">
+            Loading today's five…
+          </h1>
         </div>
       </GameLayout>
     )
@@ -193,21 +195,29 @@ const DailyChallenge: React.FC = () => {
         >
           <div className="text-5xl">🗓️</div>
           <div>
-            <h1 className="font-display font-extrabold text-3xl text-[#FFF8F0]">No challenge today</h1>
+            <h1 className="font-display font-extrabold text-3xl text-[#FFF8F0]">
+              No challenge today
+            </h1>
             <p className="text-[#9AA3D0] mt-2 text-sm">
-              {isToday ? 'Check back tomorrow for a fresh five.' : `Nothing was scheduled for ${date}.`}
+              {isToday
+                ? 'Check back tomorrow for a fresh five.'
+                : `Nothing was scheduled for ${date}.`}
             </p>
           </div>
           <div className="flex gap-3 justify-center">
-            <Button variant="ghost" onClick={() => navigate('/')}>Home</Button>
-            <Button variant="secondary" onClick={() => navigate('/daily/archive')}>Past challenges</Button>
+            <Button variant="ghost" onClick={() => navigate('/')}>
+              Home
+            </Button>
+            <Button variant="secondary" onClick={() => navigate('/daily/archive')}>
+              Past challenges
+            </Button>
           </div>
         </motion.div>
       </GameLayout>
     )
   }
 
-  // --- Results (already done or just finished) — design 3h ---
+  // --- Results (already done or just finished) - design 3h ---
   if ((phase === 'already_done' || phase === 'finished') && existingScore) {
     const details = existingScore.roundDetails ?? []
     const correctCount = details.filter((r) => r.correct).length
@@ -230,7 +240,7 @@ const DailyChallenge: React.FC = () => {
             {correctCount === totalRounds
               ? 'A perfect five. Incredible eye.'
               : correctCount >= totalRounds / 2
-                ? 'Nice eye — the AI didn’t fool you much today.'
+                ? 'Nice eye - the AI didn’t fool you much today.'
                 : 'The AI got you today. Come back tomorrow!'}
           </p>
 
@@ -252,7 +262,9 @@ const DailyChallenge: React.FC = () => {
 
           {streak > 0 && (
             <div className="mt-6 rounded-full bg-[#FFC94D]/12 px-4 py-2">
-              <span className="font-body font-semibold text-sm text-[#FFC94D]">🔥 {streak}-day streak</span>
+              <span className="font-body font-semibold text-sm text-[#FFC94D]">
+                🔥 {streak}-day streak
+              </span>
             </div>
           )}
 
@@ -272,7 +284,8 @@ const DailyChallenge: React.FC = () => {
 
           {isToday && (
             <p className="font-body text-sm text-[#6E77A8] mt-6">
-              Next five in <span className="font-display font-bold text-[#57E6D2]">{countdown}</span>
+              Next five in{' '}
+              <span className="font-display font-bold text-[#57E6D2]">{countdown}</span>
             </p>
           )}
 
@@ -289,7 +302,10 @@ const DailyChallenge: React.FC = () => {
                   const imgA = rd.isRealLeft ? rd.realImageUrl : rd.aiImageUrl
                   const imgB = rd.isRealLeft ? rd.aiImageUrl : rd.realImageUrl
                   return (
-                    <div key={rd.roundId} className="rounded-[16px] border border-white/[0.07] bg-[#1F2450] p-3">
+                    <div
+                      key={rd.roundId}
+                      className="rounded-[16px] border border-white/[0.07] bg-[#1F2450] p-3"
+                    >
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-body text-sm text-[#9AA3D0]">Round {i + 1}</span>
                         <span
@@ -309,10 +325,16 @@ const DailyChallenge: React.FC = () => {
                                 isReal ? 'border-[#57E6D2]' : 'border-white/10'
                               }`}
                             >
-                              <img src={url} alt={`Option ${opt}`} className="w-full h-full object-cover" />
+                              <img
+                                src={url}
+                                alt={`Option ${opt}`}
+                                className="w-full h-full object-cover"
+                              />
                               <span
                                 className={`absolute bottom-1.5 left-1.5 rounded-full px-2 py-0.5 font-display font-bold text-xs ${
-                                  isReal ? 'bg-[#57E6D2] text-[#151936]' : 'bg-[#151936]/80 text-[#9AA3D0]'
+                                  isReal
+                                    ? 'bg-[#57E6D2] text-[#151936]'
+                                    : 'bg-[#151936]/80 text-[#9AA3D0]'
                                 }`}
                               >
                                 {isReal ? 'REAL' : 'AI'}
@@ -371,7 +393,9 @@ const DailyChallenge: React.FC = () => {
           ))}
         </div>
         {streak > 0 ? (
-          <span className="font-body font-semibold text-sm text-[#FFC94D]">🔥 {streak}-day streak</span>
+          <span className="font-body font-semibold text-sm text-[#FFC94D]">
+            🔥 {streak}-day streak
+          </span>
         ) : (
           <span className="font-body text-sm text-[#6E77A8]">
             Round {roundIndex + 1} of {rounds.length}
@@ -400,7 +424,9 @@ const DailyChallenge: React.FC = () => {
                   <div
                     key={opt}
                     className={`relative overflow-hidden rounded-[24px] border-4 aspect-[4/3] ${
-                      isReal ? 'border-[#57E6D2] shadow-[0_0_40px_rgba(87,230,210,0.25)]' : 'border-white/10'
+                      isReal
+                        ? 'border-[#57E6D2] shadow-[0_0_40px_rgba(87,230,210,0.25)]'
+                        : 'border-white/10'
                     }`}
                   >
                     <img
@@ -517,7 +543,11 @@ const DailyChallenge: React.FC = () => {
               >
                 <X className="w-4 h-4 text-[#FFF8F0]" />
               </button>
-              <img src={zoomedImage} alt="Zoomed" className="w-full max-h-[85vh] object-contain rounded-[16px]" />
+              <img
+                src={zoomedImage}
+                alt="Zoomed"
+                className="w-full max-h-[85vh] object-contain rounded-[16px]"
+              />
             </motion.div>
           </motion.div>
         )}

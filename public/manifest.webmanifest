@@ -1,7 +1,7 @@
 {
   "name": "Real or AI",
   "short_name": "Real or AI",
-  "description": "Spot the fake. Beat your friends. Two photos, one is AI — you get 15 seconds.",
+  "description": "Spot the fake. Beat your friends. Two photos, one is AI - you get 15 seconds.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#151936",

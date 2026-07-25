@@ -4,7 +4,7 @@ import { isAdFree, adFreeUntilDate, type AdFreePublicMetadata } from '@/lib/enti
 /**
  * Client hook for the ad-free entitlement. Reads Clerk publicMetadata.
  * Guests / signed-out users are never ad-free (they see ads → the upsell).
- * While Clerk is still hydrating, `isLoaded` is false — callers should render
+ * While Clerk is still hydrating, `isLoaded` is false - callers should render
  * nothing rather than flash an ad.
  */
 export function useAdFree() {

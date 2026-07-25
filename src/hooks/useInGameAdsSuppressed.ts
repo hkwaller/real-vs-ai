@@ -8,7 +8,7 @@ import { useAdFree } from '@/hooks/useAdFree'
  * the room is (per-user Clerk metadata isn't visible across devices, so the
  * host stamps `hostAdFree` into room storage at game start).
  *
- * MUST be called inside a RoomProvider — `useStorage` throws otherwise. For a
+ * MUST be called inside a RoomProvider - `useStorage` throws otherwise. For a
  * component rendered both in and out of a room, pass suppression as a prop.
  */
 export function useInGameAdsSuppressed(): boolean {

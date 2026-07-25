@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @plugin "tailwindcss-animate";
 
@@ -38,7 +38,7 @@
     --input: rgba(255, 255, 255, 0.05);
     --ring: #ff8552;
 
-    --radius: 1.5rem; /* 24px — cards */
+    --radius: 1.5rem; /* 24px - cards */
 
     /* Extra named tokens used across screens */
     --text-muted: #6e77a8;
@@ -72,8 +72,8 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --font-display: "Baloo 2", sans-serif;
-  --font-body: "Space Grotesk", sans-serif;
+  --font-display: 'Baloo 2', sans-serif;
+  --font-body: 'Space Grotesk', sans-serif;
 }
 
 @layer base {
@@ -83,22 +83,22 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
-    font-family: "Space Grotesk", sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
   }
   h1,
   h2,
   h3,
   h4 {
-    font-family: "Baloo 2", sans-serif;
+    font-family: 'Baloo 2', sans-serif;
   }
 }
 
 /* Font utilities */
 .font-display {
-  font-family: "Baloo 2", sans-serif;
+  font-family: 'Baloo 2', sans-serif;
 }
 .font-body {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: 'Space Grotesk', sans-serif;
 }
 
 /* Sparse starfield + coral glow for page roots */
@@ -120,13 +120,13 @@
    not part of the Cosmic Arcade redesign. These map the old sci-fi helper
    classes onto the new design language so those pages stay coherent. */
 .font-orbitron {
-  font-family: "Baloo 2", sans-serif;
+  font-family: 'Baloo 2', sans-serif;
 }
 .font-space-mono {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: 'Space Grotesk', sans-serif;
 }
 .mission-label {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.12em;

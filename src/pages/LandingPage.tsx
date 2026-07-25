@@ -99,10 +99,7 @@ const LandingPage: React.FC = () => {
 
   return (
     <GameLayout className="max-w-6xl">
-      <Seo
-        title="Real or AI — Spot the fake. Beat your friends."
-        path="/"
-      />
+      <Seo title="Real or AI - Spot the fake. Beat your friends." path="/" />
       {/* Header */}
       {isLoaded && (
         <div className="flex items-center justify-between mb-10">
@@ -110,14 +107,24 @@ const LandingPage: React.FC = () => {
           <div className="flex items-center gap-3">
             {isSignedIn ? (
               <>
-                <Button variant="ghost" size="sm" className="rounded-full" onClick={() => navigate('/dashboard')}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => navigate('/dashboard')}
+                >
                   <LayoutDashboard className="w-4 h-4" />
                   Dashboard
                 </Button>
                 <UserButton />
               </>
             ) : (
-              <Button variant="ghost" size="sm" className="rounded-full" onClick={() => navigate('/sign-in')}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-full"
+                onClick={() => navigate('/sign-in')}
+              >
                 Sign in
               </Button>
             )}
@@ -125,7 +132,12 @@ const LandingPage: React.FC = () => {
         </div>
       )}
 
-      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="flex flex-col gap-8">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="flex flex-col gap-8"
+      >
         {/* Hero */}
         <motion.div
           variants={itemVariants}
@@ -139,7 +151,7 @@ const LandingPage: React.FC = () => {
               <span className="text-[#FF8552]">Beat your friends.</span>
             </h1>
             <p className="text-[#9AA3D0] text-lg mt-6 max-w-md">
-              Two photos. One is real, one is AI. You've got 15 seconds — good luck.
+              Two photos. One is real, one is AI. You've got 15 seconds - good luck.
             </p>
             <div className="flex flex-wrap items-center gap-4 mt-8">
               <Button size="lg" onClick={() => navigate('/create')}>
@@ -150,7 +162,7 @@ const LandingPage: React.FC = () => {
               </Button>
             </div>
             <p className="text-[#6E77A8] text-sm mt-5">
-              Free to play — no account needed for your first games
+              Free to play - no account needed for your first games
             </p>
           </div>
 
@@ -160,7 +172,9 @@ const LandingPage: React.FC = () => {
               <span className="font-display font-bold text-[#FFF8F0]">Live party</span>
               <span className="flex items-center gap-2 rounded-full bg-[#57E6D2]/15 px-3 py-1">
                 <span className="w-2 h-2 rounded-full bg-[#57E6D2] animate-pulse" />
-                <span className="font-body font-semibold text-xs text-[#57E6D2]">4 playing now</span>
+                <span className="font-body font-semibold text-xs text-[#57E6D2]">
+                  4 playing now
+                </span>
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2.5">
@@ -173,7 +187,9 @@ const LandingPage: React.FC = () => {
               </div>
             </div>
             <div className="mt-3 rounded-[14px] bg-[#FFC94D]/12 px-3 py-2.5">
-              <span className="font-body text-sm text-[#FFC94D]">🏆 Jonas is on a 5-round streak</span>
+              <span className="font-body text-sm text-[#FFC94D]">
+                🏆 Jonas is on a 5-round streak
+              </span>
             </div>
           </div>
         </motion.div>
@@ -198,7 +214,9 @@ const LandingPage: React.FC = () => {
                       }`}
                       style={{ height: podiumHeights[rank] }}
                     >
-                      <span className="font-display font-extrabold text-lg leading-none">{rank}</span>
+                      <span className="font-display font-extrabold text-lg leading-none">
+                        {rank}
+                      </span>
                     </div>
                   </div>
                 )

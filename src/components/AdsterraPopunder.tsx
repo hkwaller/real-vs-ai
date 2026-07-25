@@ -12,7 +12,7 @@ type Props = {
  * Adsterra popunder. Appends the invoke.js script to <body> once, guarded by a
  * ref so it fires a single time per mount. Self-gates on the ad-free
  * entitlement. Renders no DOM. In multiplayer, mount this only on player
- * devices — never the shared host display.
+ * devices - never the shared host display.
  */
 const AdsterraPopunder: React.FC<Props> = ({ suppressed = false }) => {
   const { isAdFree, isLoaded } = useAdFree()

@@ -36,10 +36,7 @@ const DailyChallengeArchive: React.FC = () => {
       ])
 
       const today = getTodayDate()
-      const allDates = new Set<string>([
-        ...Object.keys(schedule ?? {}),
-        ...Object.keys(scores),
-      ])
+      const allDates = new Set<string>([...Object.keys(schedule ?? {}), ...Object.keys(scores)])
 
       const sorted = Array.from(allDates).sort((a, b) => b.localeCompare(a))
 
@@ -66,7 +63,7 @@ const DailyChallengeArchive: React.FC = () => {
     return (
       <GameLayout>
         <Seo
-          title="Daily Challenge Archive — Real or AI"
+          title="Daily Challenge Archive - Real or AI"
           description="Browse and replay every past Real-or-AI daily challenge. See if you can still spot the AI-generated photo."
           path="/daily/archive"
         />
@@ -88,7 +85,7 @@ const DailyChallengeArchive: React.FC = () => {
   return (
     <GameLayout>
       <Seo
-        title="Daily Challenge Archive — Real or AI"
+        title="Daily Challenge Archive - Real or AI"
         description="Browse and replay every past Real-or-AI daily challenge. See if you can still spot the AI-generated photo."
         path="/daily/archive"
       />
@@ -107,7 +104,9 @@ const DailyChallengeArchive: React.FC = () => {
 
         {entries.length === 0 ? (
           <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-8 w-full text-center">
-            <p className="text-[#8B97C8] font-space-mono text-sm">// No challenges available yet.</p>
+            <p className="text-[#8B97C8] font-space-mono text-sm">
+              // No challenges available yet.
+            </p>
           </div>
         ) : (
           <motion.div
@@ -133,9 +132,7 @@ const DailyChallengeArchive: React.FC = () => {
                     year: 'numeric',
                   })
 
-              const thumbnails = roundDetails
-                .slice(0, 3)
-                .map((rd) => rd.realImageUrl)
+              const thumbnails = roundDetails.slice(0, 3).map((rd) => rd.realImageUrl)
 
               return (
                 <motion.div
@@ -158,11 +155,7 @@ const DailyChallengeArchive: React.FC = () => {
                         <div className="grid grid-cols-3 h-28 overflow-hidden">
                           {thumbnails.map((url, i) => (
                             <div key={i} className="relative overflow-hidden">
-                              <img
-                                src={url}
-                                alt=""
-                                className="w-full h-full object-cover"
-                              />
+                              <img src={url} alt="" className="w-full h-full object-cover" />
                               {/* per-thumb result indicator */}
                               <div className="absolute bottom-1 right-1">
                                 {roundDetails[i].correct ? (
@@ -183,7 +176,9 @@ const DailyChallengeArchive: React.FC = () => {
                             <p className="font-orbitron text-sm font-bold text-[#F5F0E8] uppercase tracking-wide leading-tight">
                               {displayDate}
                             </p>
-                            <p className="font-space-mono text-xs text-[#8B97C8] mt-0.5">{entry.date}</p>
+                            <p className="font-space-mono text-xs text-[#8B97C8] mt-0.5">
+                              {entry.date}
+                            </p>
                           </div>
                           <Trophy className="w-4 h-4 text-[#FFB830] shrink-0 mt-0.5" />
                         </div>
@@ -243,13 +238,17 @@ const DailyChallengeArchive: React.FC = () => {
                           <p className="font-orbitron text-sm font-bold text-[#F5F0E8] uppercase tracking-wide leading-tight">
                             {displayDate}
                           </p>
-                          <p className="font-space-mono text-xs text-[#8B97C8] mt-0.5">{entry.date}</p>
+                          <p className="font-space-mono text-xs text-[#8B97C8] mt-0.5">
+                            {entry.date}
+                          </p>
                         </div>
 
                         {isToday && (
                           <div className="flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-[#FF6B1A] animate-pulse" />
-                            <span className="font-space-mono text-xs text-[#FF6B1A]">Active Today</span>
+                            <span className="font-space-mono text-xs text-[#FF6B1A]">
+                              Active Today
+                            </span>
                           </div>
                         )}
 

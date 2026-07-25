@@ -4,19 +4,19 @@ import { Helmet } from '@dr.pogodin/react-helmet'
  * Per-route document metadata via Helmet.
  *
  * Helmet reconciles head tags through its own `data-rh` markers, so the tags
- * baked into the prerendered HTML (see vite.config.js) are taken over — not
- * duplicated — when the client mounts. It also swaps tags cleanly on SPA
+ * baked into the prerendered HTML (see vite.config.js) are taken over - not
+ * duplicated - when the client mounts. It also swaps tags cleanly on SPA
  * navigation. One <Seo> per page = a single source of truth.
  */
 
 const SITE_URL = 'https://real-vs-ai.buzz'
 const SITE_NAME = 'Real or AI'
 const DEFAULT_DESCRIPTION =
-  'Two photos, one is real and one is AI-generated. You get 15 seconds to spot the fake. Free multiplayer party game plus a new daily challenge — no account needed to play.'
+  'Two photos, one is real and one is AI-generated. You get 15 seconds to spot the fake. Free multiplayer party game plus a new daily challenge - no account needed to play.'
 const DEFAULT_IMAGE = `${SITE_URL}/og-image.png`
 
 export interface SeoProps {
-  /** Full <title>. Include the brand, e.g. "Daily Challenge — Real or AI". */
+  /** Full <title>. Include the brand, e.g. "Daily Challenge - Real or AI". */
   title: string
   description?: string
   /** Route path for canonical/og:url, e.g. "/daily". Defaults to "/". */
