@@ -13,6 +13,7 @@
   "dependencies": {
     "@clerk/backend": "^3.2.2",
     "@clerk/react": "^6.1.1",
+    "@dr.pogodin/react-helmet": "^3.2.2",
     "@liveblocks/client": "^3.15.4",
     "@liveblocks/react": "^3.15.4",
     "@radix-ui/react-dialog": "^1.1.15",

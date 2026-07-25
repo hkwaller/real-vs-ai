@@ -1,8 +1,12 @@
+import { Helmet } from '@dr.pogodin/react-helmet'
+
 /**
- * Per-route document metadata using React 19's native metadata hoisting.
- * Rendering <title>/<meta>/<link> anywhere in the tree moves them into <head>.
- * One <Seo> per page keeps a single source of truth (no duplicate tags), and
- * react-snap bakes the result into the prerendered HTML for crawlers/scrapers.
+ * Per-route document metadata via Helmet.
+ *
+ * Helmet reconciles head tags through its own `data-rh` markers, so the tags
+ * baked into the prerendered HTML (see vite.config.js) are taken over — not
+ * duplicated — when the client mounts. It also swaps tags cleanly on SPA
+ * navigation. One <Seo> per page = a single source of truth.
  */
 
 const SITE_URL = 'https://real-vs-ai.buzz'
@@ -36,7 +40,7 @@ export default function Seo({
   const img = image.startsWith('http') ? image : `${SITE_URL}${image}`
 
   return (
-    <>
+    <Helmet>
       <title>{title}</title>
       <meta name="description" content={description} />
       <link rel="canonical" href={url} />
@@ -58,6 +62,6 @@ export default function Seo({
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={img} />
-    </>
+    </Helmet>
   )
 }
