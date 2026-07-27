@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "vercel dev --listen 5173",
+    "prebuild": "puppeteer browsers install chrome",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
