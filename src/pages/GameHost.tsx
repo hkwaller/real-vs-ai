@@ -22,6 +22,7 @@ import {
   useStorage,
   useMutation,
   useBroadcastEvent,
+  useEventListener,
   useStatus,
   LiveList,
   LiveMap,
@@ -52,6 +53,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const settingsObj = useStorage((root) => root.settings)
   const storedPlayers = useStorage((root) => root.players)
   const scores = useStorage((root) => root.scores)
+  const bossPlayerId = useStorage((root) => root.bossPlayerId ?? null)
 
   const others = useOthers()
   const broadcast = useBroadcastEvent()
@@ -386,6 +388,21 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     }
   }
 
+  // Boss remote control. Commands are only honoured from the player currently
+  // marked as boss in storage.
+  const nextRoundRef = useRef<() => void>(() => {})
+  nextRoundRef.current = nextRound
+  const showResultRef = useRef(showResult)
+  showResultRef.current = showResult
+
+  useEventListener(({ event }) => {
+    if (event.type !== 'BOSS_REVEAL' && event.type !== 'BOSS_NEXT_ROUND') return
+    if (!bossPlayerId || event.playerId !== bossPlayerId) return
+    if (event.type === 'BOSS_REVEAL') revealResultRef.current()
+    // Only advance from the reveal screen, so a round is never skipped unscored.
+    else if (showResultRef.current) nextRoundRef.current()
+  })
+
   // Loading state
   if (!gameStatus || !currentRound) {
     return (
@@ -520,6 +537,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   )
 
   const liveVotesVisible = settings?.revealMode === 'instant'
+  const bossName = bossPlayerId ? (playerLookup.get(bossPlayerId)?.name ?? null) : null
 
   const VoterCluster: React.FC<{ side: 'A' | 'B' }> = ({ side }) => {
     const voters = Object.entries(votes).filter(([, choice]) => choice === side)
@@ -614,48 +632,75 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     const winnerLetter = correctChoice
     return (
       <GameLayout className="max-w-6xl">
-        <h1 className="text-center font-display font-extrabold text-[34px] md:text-[44px] text-[#FFF8F0] mb-6">
+        <h1 className="text-center font-display font-extrabold text-[30px] md:text-[40px] text-[#FFF8F0] mb-4">
           <span className="text-[#57E6D2]">{winnerLetter} was real!</span> {correctCount} of{' '}
           {totalPlayers} got it 🎉
         </h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Real photo */}
-          <motion.div
-            initial={{ scale: 0.92, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="relative rounded-[24px] overflow-hidden border-4 border-[#57E6D2] shadow-[0_0_40px_rgba(87,230,210,0.25)] aspect-[4/3]"
-          >
-            <img src={currentRound.realImageUrl} className="w-full h-full object-cover" />
-            <span className="absolute top-3 left-3 rounded-full bg-[#57E6D2] text-[#151936] font-display font-extrabold text-sm px-3 py-1 z-10">
-              ✓ REAL
-            </span>
-            <VoterCluster side={correctChoice} />
-          </motion.div>
+        {/* Images keep the exact same left/right positions as during the round,
+            so A stays where players saw it. Height is capped so the standings
+            row below stays visible on a TV without scrolling. */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+          {(['A', 'B'] as const).map((letter, i) => {
+            const isReal = letter === correctChoice
+            const letterBadge =
+              letter === 'A'
+                ? 'bg-[#FF8552] text-[#151936] shadow-[0_4px_0_#C25327]'
+                : 'bg-[#57E6D2] text-[#151936] shadow-[0_4px_0_#2FA391]'
+            return (
+              <motion.div
+                key={letter}
+                initial={{ scale: 0.92, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: i * 0.05 }}
+                className={`relative rounded-[24px] aspect-[4/3] max-h-[46vh] ${
+                  isReal
+                    ? 'border-4 border-[#57E6D2] shadow-[0_0_40px_rgba(87,230,210,0.25)]'
+                    : 'border-4 border-white/10'
+                }`}
+              >
+                <div className="absolute inset-0 rounded-[20px] overflow-hidden">
+                  <img
+                    src={letter === 'A' ? leftImage : rightImage}
+                    className="w-full h-full object-cover"
+                    style={isReal ? undefined : { filter: 'saturate(.6) brightness(.8)' }}
+                  />
+                </div>
+                <div
+                  className={`absolute -top-3.5 -left-3.5 w-11 h-11 rounded-[14px] flex items-center justify-center font-display font-extrabold text-xl z-20 ${letterBadge}`}
+                >
+                  {letter}
+                </div>
+                <span
+                  className={`absolute top-3 right-3 rounded-full font-display font-extrabold text-sm px-3 py-1 z-20 ${
+                    isReal ? 'bg-[#57E6D2] text-[#151936]' : 'bg-[#FF6A6A] text-[#151936]'
+                  }`}
+                >
+                  {isReal ? '✓ REAL' : '🤖 AI'}
+                </span>
+                <VoterCluster side={letter} />
+              </motion.div>
+            )
+          })}
+        </div>
 
-          {/* AI photo */}
-          <motion.div
-            initial={{ scale: 0.92, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.05 }}
-            className="relative rounded-[24px] overflow-hidden border-4 border-white/10 aspect-[4/3]"
-          >
-            <img
-              src={currentRound.aiImageUrl}
-              className="w-full h-full object-cover"
-              style={{ filter: 'saturate(.6) brightness(.8)' }}
-            />
-            <span className="absolute top-3 left-3 rounded-full bg-[#FF6A6A] text-[#151936] font-display font-extrabold text-sm px-3 py-1 z-10">
-              🤖 AI
-            </span>
-            <VoterCluster side={correctChoice === 'A' ? 'B' : 'A'} />
-          </motion.div>
-
-          {/* Standings */}
-          <div className="rounded-[24px] border border-white/[0.07] bg-[#1F2450] p-5 flex flex-col">
-            <h3 className="font-display font-bold text-[#FFF8F0] text-lg mb-4">Standings</h3>
-            <div className="space-y-2 flex-1">
-              {players.map((p, i) => {
+        {/* Standings - full width row underneath the images */}
+        <div className="rounded-[24px] border border-white/[0.07] bg-[#1F2450] p-5 mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h3 className="font-display font-bold text-[#FFF8F0] text-lg">Standings</h3>
+              {bossName && (
+                <span className="rounded-full bg-[#FFC94D]/15 px-3 py-1 font-body text-sm text-[#FFC94D]">
+                  👑 {bossName} can advance too
+                </span>
+              )}
+            </div>
+            <Button className="min-w-[190px]" onClick={nextRound}>
+              {currentRoundIndex + 1 >= totalRounds ? 'See results →' : 'Next round →'}
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {players.map((p, i) => {
                 const rank = i + 1
                 const prev = prevRanksRef.current[p.id] ?? rank
                 const delta = prev - rank
@@ -689,10 +734,6 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                   </motion.div>
                 )
               })}
-            </div>
-            <Button className="w-full mt-4" onClick={nextRound}>
-              {currentRoundIndex + 1 >= totalRounds ? 'See results →' : 'Next round →'}
-            </Button>
           </div>
         </div>
         {/* Between-rounds reveal - safe to show a banner here. */}
@@ -806,6 +847,7 @@ const GameHost: React.FC = () => {
         scores: new LiveMap(),
         players: new LiveList([]),
         hostAdFree: false,
+        bossPlayerId: null,
       }}
     >
       <GameHostContent code={code} />

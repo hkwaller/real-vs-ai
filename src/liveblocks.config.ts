@@ -31,12 +31,20 @@ export type Storage = {
   // Host perk: true when the device that started the game is ad-free, which
   // suppresses in-game ads for everyone in the room. Stamped at game start.
   hostAdFree: boolean;
+  // The "boss" player may drive the game from their own device (start, reveal,
+  // advance). Set from the lobby. null = only the host display controls the game.
+  bossPlayerId: string | null;
 };
 
 type RoomEvent =
   | { type: "ROUND_REVEALED"; correctChoice: "A" | "B"; scores: Record<string, number> }
   | { type: "GAME_OVER" }
-  | { type: "PLAYER_KICKED"; playerId: string };
+  | { type: "PLAYER_KICKED"; playerId: string }
+  // Boss remote-control commands. The host validates the sender against
+  // storage.bossPlayerId before acting.
+  | { type: "BOSS_START"; playerId: string }
+  | { type: "BOSS_REVEAL"; playerId: string }
+  | { type: "BOSS_NEXT_ROUND"; playerId: string };
 
 export const {
   RoomProvider,

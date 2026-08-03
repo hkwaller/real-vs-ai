@@ -11,6 +11,7 @@ import {
   useMutation,
   useStatus,
   useStorage,
+  useEventListener,
   LiveList,
   LiveMap,
   LiveObject,
@@ -39,6 +40,13 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
   const status = useStatus();
   const storageLoaded = useStorage((root) => root.gameStatus) !== null;
   const isReady = status === 'connected' && storageLoaded;
+
+  const bossPlayerId = useStorage((root) => root.bossPlayerId ?? null);
+
+  // Tapping a player promotes them to boss; tapping the boss again clears it.
+  const setBoss = useMutation(({ storage }, id: string | null) => {
+    storage.set('bossPlayerId', id);
+  }, []);
 
   const writeSettings = useMutation(({ storage }, s: GameSettings) => {
     const settingsObj = storage.get('settings');
@@ -76,6 +84,13 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
     startGame(hostIsAdFree);
     navigate(`/game/${code}`);
   };
+
+  // The boss can kick the game off from their own device.
+  useEventListener(({ event }) => {
+    if (event.type !== 'BOSS_START') return;
+    if (!bossPlayerId || event.playerId !== bossPlayerId) return;
+    handleStart();
+  });
 
   const settingsSummary = `${settings.rounds} rounds · ${settings.timeLimit}s each · ${
     settings.revealMode === 'instant' ? 'live votes' : 'votes at the end'
@@ -129,27 +144,48 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
             <div className="flex-1 min-h-[240px]">
               <div className="grid grid-cols-2 gap-3">
                 <AnimatePresence>
-                  {players.map((player) => (
-                    <motion.div
-                      key={player.id}
-                      initial={{ opacity: 0, scale: 0.5 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.5 }}
-                      transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-                      className="rounded-[16px] bg-white/5 px-4 py-3 flex items-center gap-3"
-                    >
-                      <span className="text-[30px] leading-none">{player.emoji}</span>
-                      <span className="font-display font-bold text-[17px] text-[#FFF8F0] truncate">
-                        {player.name}
-                      </span>
-                    </motion.div>
-                  ))}
+                  {players.map((player) => {
+                    const isBoss = player.id === bossPlayerId;
+                    return (
+                      <motion.button
+                        key={player.id}
+                        type="button"
+                        onClick={() => setBoss(isBoss ? null : player.id)}
+                        initial={{ opacity: 0, scale: 0.5 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.5 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+                        title={isBoss ? 'Remove boss' : 'Make boss'}
+                        className={`rounded-[16px] px-4 py-3 flex items-center gap-3 text-left transition-colors ${
+                          isBoss
+                            ? 'bg-[#FFC94D]/15 border-2 border-[#FFC94D]'
+                            : 'bg-white/5 border-2 border-transparent hover:bg-white/10'
+                        }`}
+                      >
+                        <span className="text-[30px] leading-none">{player.emoji}</span>
+                        <span className="font-display font-bold text-[17px] text-[#FFF8F0] truncate">
+                          {player.name}
+                        </span>
+                        {isBoss && (
+                          <span className="ml-auto shrink-0 rounded-full bg-[#FFC94D] px-2 py-0.5 font-display font-extrabold text-[11px] text-[#151936]">
+                            BOSS
+                          </span>
+                        )}
+                      </motion.button>
+                    );
+                  })}
                 </AnimatePresence>
                 <div className="rounded-[16px] border border-dashed border-white/15 px-4 py-3 flex items-center text-[#6E77A8]">
                   <span className="font-body text-sm">Waiting for more…</span>
                 </div>
               </div>
             </div>
+
+            <p className="font-body text-sm text-[#6E77A8] mt-4">
+              {bossPlayerId
+                ? '👑 Tap the boss again to hand control back to this screen.'
+                : 'Tap a player to make them boss — they can start and run the game from their phone.'}
+            </p>
 
             <Button
               size="xl"
@@ -205,6 +241,7 @@ const Lobby: React.FC = () => {
         scores: new LiveMap(),
         players: new LiveList([]),
         hostAdFree: false,
+        bossPlayerId: null,
       }}
     >
       <LobbyContent code={code} settings={settings} />

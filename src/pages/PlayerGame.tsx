@@ -14,6 +14,7 @@ import {
   useMutation,
   useUpdateMyPresence,
   useEventListener,
+  useBroadcastEvent,
   LiveList,
   LiveMap,
   LiveObject,
@@ -54,6 +55,18 @@ const PlayerGameContent: React.FC<{
   const rounds = useStorage((root) => root.rounds)
   const settingsObj = useStorage((root) => root.settings)
   const scoresMap = useStorage((root) => root.scores)
+  const bossPlayerId = useStorage((root) => root.bossPlayerId ?? null)
+
+  // The boss drives the game from their own device; the host display obeys.
+  const broadcast = useBroadcastEvent()
+  const isBoss = bossPlayerId !== null && bossPlayerId === playerId
+  const [bossCommandSent, setBossCommandSent] = useState(false)
+
+  const sendBossCommand = (type: 'BOSS_START' | 'BOSS_REVEAL' | 'BOSS_NEXT_ROUND') => {
+    if (!isBoss) return
+    setBossCommandSent(true)
+    broadcast({ type, playerId })
+  }
 
   const currentRoundIndex = currentRoundIndexObj?.value ?? 0
   const currentRound = rounds?.[currentRoundIndex] ?? null
@@ -87,6 +100,7 @@ const PlayerGameContent: React.FC<{
     setVoteChoice(null)
     voteChoiceRef.current = null
     setRoundResult(null)
+    setBossCommandSent(false)
     updatePresence({ hasVoted: false, currentVote: null, timeRemaining: null })
 
     const interval = setInterval(() => {
@@ -163,7 +177,23 @@ const PlayerGameContent: React.FC<{
           <h1 className="font-display font-extrabold text-2xl text-[#FFF8F0]">
             Get ready, {playerName}
           </h1>
-          <p className="text-[#9AA3D0] text-sm">Waiting for the host to start…</p>
+          {isBoss ? (
+            <>
+              <p className="text-[#FFC94D] font-body text-sm font-semibold">
+                👑 You're the boss — you run this game
+              </p>
+              <Button
+                size="lg"
+                className="w-full"
+                onClick={() => sendBossCommand('BOSS_START')}
+                disabled={bossCommandSent}
+              >
+                {bossCommandSent ? 'Starting…' : 'Start the game ▶'}
+              </Button>
+            </>
+          ) : (
+            <p className="text-[#9AA3D0] text-sm">Waiting for the host to start…</p>
+          )}
           <button
             onClick={() => navigate('/join')}
             className="font-body text-sm text-[#6E77A8] hover:text-[#FFF8F0] transition-colors"
@@ -236,9 +266,20 @@ const PlayerGameContent: React.FC<{
             </div>
           )}
 
-          <p className="font-body text-sm text-[#6E77A8] mt-8 animate-pulse">
-            Waiting for the next round…
-          </p>
+          {isBoss ? (
+            <Button
+              size="lg"
+              className="mt-8 w-full"
+              onClick={() => sendBossCommand('BOSS_NEXT_ROUND')}
+              disabled={bossCommandSent}
+            >
+              {bossCommandSent ? 'Loading…' : 'Next round →'}
+            </Button>
+          ) : (
+            <p className="font-body text-sm text-[#6E77A8] mt-8 animate-pulse">
+              Waiting for the next round…
+            </p>
+          )}
         </div>
       </GameLayout>
     )
@@ -249,7 +290,10 @@ const PlayerGameContent: React.FC<{
       <div className="flex items-center gap-3">
         <span className="text-2xl leading-none">{playerEmoji}</span>
         <div className="text-left">
-          <p className="font-display font-bold text-[#FFF8F0] leading-tight">{playerName}</p>
+          <p className="font-display font-bold text-[#FFF8F0] leading-tight">
+            {playerName}
+            {isBoss && <span className="ml-1.5 text-[#FFC94D]">👑</span>}
+          </p>
           <p className="font-body text-xs text-[#9AA3D0]">
             Round {currentRoundIndex + 1} of {totalRounds}
           </p>
@@ -339,6 +383,16 @@ const PlayerGameContent: React.FC<{
                 <p className="font-body text-sm text-[#9AA3D0]">
                   You picked {voteChoice}. Watch the big screen…
                 </p>
+                {isBoss && (
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => sendBossCommand('BOSS_REVEAL')}
+                    disabled={bossCommandSent}
+                  >
+                    👑 Reveal now
+                  </Button>
+                )}
               </div>
             </motion.div>
           )}
@@ -396,6 +450,7 @@ const PlayerGame: React.FC = () => {
         scores: new LiveMap(),
         players: new LiveList([]),
         hostAdFree: false,
+        bossPlayerId: null,
       }}
     >
       <PlayerGameContent playerId={playerId} playerName={playerName} playerEmoji={playerEmoji} />
