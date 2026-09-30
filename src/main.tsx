@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot, hydrateRoot } from 'react-dom/client'
 import './index.css'
+import './lib/analytics'
 import App from './App.jsx'
 import { ClerkProvider } from '@clerk/react'
 import { HelmetProvider } from '@dr.pogodin/react-helmet'
