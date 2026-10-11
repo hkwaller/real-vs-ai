@@ -230,6 +230,7 @@ const LandingPage: React.FC = () => {
           </div>
         </motion.div>
       </motion.div>
+      <footer className="mx-auto flex flex-wrap justify-center gap-6 py-8 text-sm text-white"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://playam.app">A game from Playam</a></footer>
     </GameLayout>
   )
 }

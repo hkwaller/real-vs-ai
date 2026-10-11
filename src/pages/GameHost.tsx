@@ -11,8 +11,6 @@ import {
 } from '@/components/ui/dialog'
 import GameLayout from '@/components/GameLayout'
 import CountdownRing from '@/components/CountdownRing'
-import AdsterraBanner from '@/components/AdsterraBanner'
-import { useInGameAdsSuppressed } from '@/hooks/useInGameAdsSuppressed'
 import { supabase } from '@/lib/supabase'
 import { Users, UserX, X, Loader2 } from 'lucide-react'
 import confetti from 'canvas-confetti'
@@ -43,7 +41,6 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
 
   // In-game ads: hidden if the host started the game ad-free (host perk) or if
   // this viewer is ad-free. The banner also self-gates on the local entitlement.
-  const adsSuppressed = useInGameAdsSuppressed()
 
   const status = useStatus()
 
@@ -517,7 +514,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
         </div>
         {/* Results screen - banner allowed. Popunder is player-device only, not
             fired on this shared host display. */}
-        <AdsterraBanner suppressed={adsSuppressed} />
+
       </GameLayout>
     )
   }
@@ -737,7 +734,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
           </div>
         </div>
         {/* Between-rounds reveal - safe to show a banner here. */}
-        <AdsterraBanner suppressed={adsSuppressed} />
+
       </GameLayout>
     )
   }

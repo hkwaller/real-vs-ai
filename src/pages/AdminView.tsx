@@ -12,7 +12,9 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import GameLayout from '@/components/GameLayout'
+import { useAuth, useUser } from '@clerk/react'
 import { supabase } from '@/lib/supabase'
+import { adminUpload, adminRemove } from '@/lib/adminStorage'
 import { fetchSchedule, saveSchedule, getTodayDate, type DailySchedule } from '@/lib/dailyChallenge'
 import {
   Loader2,
@@ -33,6 +35,10 @@ interface ImagePair {
 }
 
 const AdminView: React.FC = () => {
+  const { user, isLoaded: userLoaded } = useUser()
+  const { getToken } = useAuth()
+  const isAdmin = user?.publicMetadata?.role === 'admin'
+
   // Real Upload State
   const [imageUrl, setImageUrl] = useState('')
   const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null)
@@ -140,7 +146,7 @@ const AdminView: React.FC = () => {
     setSaving(true)
     setScheduleStatus('idle')
     const updated = { ...schedule, [selectedDate]: { images: selectedImages } }
-    const ok = await saveSchedule(updated)
+    const ok = await saveSchedule(updated, getToken)
     if (ok) {
       setSchedule(updated)
       setScheduleStatus('success')
@@ -154,7 +160,7 @@ const AdminView: React.FC = () => {
     if (!confirm(`Delete challenge for ${date}?`)) return
     const updated = { ...schedule }
     delete updated[date]
-    const ok = await saveSchedule(updated)
+    const ok = await saveSchedule(updated, getToken)
     if (ok) {
       setSchedule(updated)
       if (selectedDate === date) {
@@ -306,15 +312,10 @@ const AdminView: React.FC = () => {
         before: Math.round(aiFile.size / 1024),
         after: Math.round(compressed.size / 1024),
       })
-      const { error } = await supabase.storage
-        .from('real-vs-ai')
-        .upload(`ai/${generatedName}.jpg`, compressed, {
-          cacheControl: '0',
-          upsert: true,
-          contentType: 'image/jpeg',
-        })
-
-      if (error) throw error
+      await adminUpload(getToken, `ai/${generatedName}.jpg`, compressed, {
+        cacheControl: '0',
+        contentType: 'image/jpeg',
+      })
 
       // Auto-assign to the first upcoming date with no challenge
       const today = getTodayDate()
@@ -335,7 +336,7 @@ const AdminView: React.FC = () => {
 
       if (assignedDate) {
         const updated = { ...schedule, [assignedDate]: { images: [generatedName + '.jpg'] } }
-        await saveSchedule(updated)
+        await saveSchedule(updated, getToken)
         setSchedule(updated)
         // Jump calendar to that month so the user sees the assignment
         const d = new Date(assignedDate + 'T12:00:00')
@@ -364,11 +365,7 @@ const AdminView: React.FC = () => {
     setDeleting(filename)
     console.log('deleting', filename)
     try {
-      const { error } = await supabase.storage
-        .from('real-vs-ai')
-        .remove([`real/${filename}`, `ai/${filename}`])
-
-      if (error) throw error
+      await adminRemove(getToken, [`real/${filename}`, `ai/${filename}`])
 
       await fetchImages()
     } catch (error) {
@@ -392,15 +389,10 @@ const AdminView: React.FC = () => {
 
     try {
       const compressed = await compressImage(file)
-      const { error } = await supabase.storage
-        .from('real-vs-ai')
-        .upload(`ai/${filename}`, compressed, {
-          cacheControl: '0',
-          upsert: true,
-          contentType: 'image/jpeg',
-        })
-
-      if (error) throw error
+      await adminUpload(getToken, `ai/${filename}`, compressed, {
+        cacheControl: '0',
+        contentType: 'image/jpeg',
+      })
 
       // Refresh list
       await fetchImages()
@@ -436,14 +428,10 @@ const AdminView: React.FC = () => {
     const { name, side } = uploadingSlot
     try {
       const toUpload = side === 'ai' ? await compressImage(file) : file
-      const { error } = await supabase.storage
-        .from('real-vs-ai')
-        .upload(`${side}/${name}`, toUpload, {
-          cacheControl: '0',
-          upsert: true,
-          ...(side === 'ai' && { contentType: 'image/jpeg' }),
-        })
-      if (error) throw error
+      await adminUpload(getToken, `${side}/${name}`, toUpload, {
+        cacheControl: '0',
+        ...(side === 'ai' && { contentType: 'image/jpeg' }),
+      })
       setMissingSlots((prev) => {
         const updated = { ...prev }
         if (updated[name] === 'both') updated[name] = side === 'real' ? 'ai' : 'real'
@@ -466,6 +454,18 @@ const AdminView: React.FC = () => {
       .filter(([date]) => date !== selectedDate)
       .flatMap(([, entry]) => (Array.isArray(entry?.images) ? entry.images : [])),
   )
+
+  if (!userLoaded) return null
+
+  if (!isAdmin) {
+    return (
+      <GameLayout>
+        <div className="max-w-md mx-auto text-center text-muted-foreground">
+          This page is for admins only.
+        </div>
+      </GameLayout>
+    )
+  }
 
   return (
     <GameLayout>

@@ -10,4 +10,4 @@ Disallow: /play/
 Disallow: /sign-in
 Disallow: /sign-up
 
-Sitemap: https://real-vs-ai.buzz/sitemap.xml
+Sitemap: https://realvsai.playam.app/sitemap.xml

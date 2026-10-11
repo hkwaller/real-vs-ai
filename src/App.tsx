@@ -13,7 +13,7 @@ import SignInPage from './pages/SignInPage'
 import SignUpPage from './pages/SignUpPage'
 import DailyChallenge from './pages/DailyChallenge'
 import DailyChallengeArchive from './pages/DailyChallengeArchive'
-import GoAdFree from './pages/GoAdFree'
+import PublicLegal from './pages/PublicLegal'
 
 function ProtectedRoute({ element }: { element: React.ReactElement }) {
   const { isSignedIn, isLoaded } = useAuth()
@@ -40,7 +40,8 @@ function App() {
         <Route path="/daily/archive" element={<DailyChallengeArchive />} />
         <Route path="/daily/:date" element={<DailyChallenge />} />
         <Route path="/daily" element={<DailyChallenge />} />
-        <Route path="/go-ad-free" element={<GoAdFree />} />
+        <Route path="/privacy" element={<PublicLegal path="/privacy" />} />
+        <Route path="/terms" element={<PublicLegal path="/terms" />} />
       </Routes>
     </Router>
   )

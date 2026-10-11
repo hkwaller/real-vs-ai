@@ -1,19 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://real-vs-ai.buzz/</loc>
+    <loc>https://realvsai.playam.app/</loc>
     <lastmod>2026-07-25</lastmod>
   </url>
   <url>
-    <loc>https://real-vs-ai.buzz/daily</loc>
+    <loc>https://realvsai.playam.app/daily</loc>
     <lastmod>2026-07-25</lastmod>
   </url>
   <url>
-    <loc>https://real-vs-ai.buzz/daily/archive</loc>
+    <loc>https://realvsai.playam.app/daily/archive</loc>
     <lastmod>2026-07-25</lastmod>
   </url>
-  <url>
-    <loc>https://real-vs-ai.buzz/go-ad-free</loc>
-    <lastmod>2026-07-25</lastmod>
-  </url>
-</urlset>
+<url><loc>https://realvsai.playam.app/privacy</loc></url><url><loc>https://realvsai.playam.app/terms</loc></url></urlset>

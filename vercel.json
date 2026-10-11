@@ -9,7 +9,15 @@
       "destination": "https://eu.i.posthog.com/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/privacy",
+      "destination": "/privacy/index.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/terms/index.html"
+    },
+    {
+      "source": "/((?!api/|@|.*\\.[a-zA-Z0-9]+$).*)",
       "destination": "/index.html"
     }
   ]

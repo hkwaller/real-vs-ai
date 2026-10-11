@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { adminUpload, type GetToken } from './adminStorage'
 
 export type DailyScheduleEntry = {
   images: string[]
@@ -65,15 +66,11 @@ export async function fetchSchedule(): Promise<DailySchedule | null> {
   }
 }
 
-export async function saveSchedule(schedule: DailySchedule): Promise<boolean> {
+export async function saveSchedule(schedule: DailySchedule, getToken: GetToken): Promise<boolean> {
   try {
     const blob = new Blob([JSON.stringify(schedule, null, 2)], { type: 'application/json' })
-    const file = new File([blob], 'schedule.json', { type: 'application/json' })
-    const { error } = await supabase.storage.from(BUCKET).upload(SCHEDULE_PATH, file, {
-      upsert: true,
-      contentType: 'application/json',
-    })
-    return !error
+    await adminUpload(getToken, SCHEDULE_PATH, blob, { contentType: 'application/json' })
+    return true
   } catch {
     return false
   }

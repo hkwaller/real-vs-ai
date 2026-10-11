@@ -9,7 +9,7 @@ import { Helmet } from '@dr.pogodin/react-helmet'
  * navigation. One <Seo> per page = a single source of truth.
  */
 
-const SITE_URL = 'https://real-vs-ai.buzz'
+const SITE_URL = 'https://realvsai.playam.app'
 const SITE_NAME = 'Real or AI'
 const DEFAULT_DESCRIPTION =
   'Two photos, one is real and one is AI-generated. You get 15 seconds to spot the fake. Free multiplayer party game plus a new daily challenge - no account needed to play.'

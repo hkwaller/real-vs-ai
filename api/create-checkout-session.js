@@ -1,11 +1,27 @@
 import Stripe from 'stripe'
-import { createClerkClient } from '@clerk/backend'
+import { createClerkClient, verifyToken } from '@clerk/backend'
 
 const baseUrl =
   process.env.APP_URL ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:5173')
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY })
+
+// Resolve the caller from their Clerk session token - never trust ids in the body.
+async function getAuthedUser(req) {
+  const token = req.headers.authorization?.replace(/^Bearer /, '')
+  if (!token) return null
+  try {
+    const { sub } = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY })
+    return await clerk.users.getUser(sub)
+  } catch {
+    return null
+  }
+}
+
+const primaryEmail = (user) =>
+  user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)?.emailAddress ??
+  user.emailAddresses[0]?.emailAddress
 
 // plan -> Stripe price id + checkout mode. Day pass is a one-time payment;
 // month/year are recurring subscriptions. One entitlement (adFreeUntil) covers both.
@@ -20,10 +36,17 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { userId, userEmail, plan } = req.body
+  const user = await getAuthedUser(req)
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  const userId = user.id
+  const userEmail = primaryEmail(user)
 
-  if (!userId || !userEmail || !plan) {
-    return res.status(400).json({ error: 'Missing required fields (userId, userEmail, plan)' })
+  const { plan } = req.body ?? {}
+
+  if (!userEmail || !plan) {
+    return res.status(400).json({ error: 'Missing required fields (email, plan)' })
   }
 
   const config = PLANS[plan]
@@ -35,13 +58,7 @@ export default async function handler(req, res) {
 
   // Resolve the Stripe customer: prefer the id cached on the Clerk user, then
   // an existing customer by email, otherwise create one. Cache it for next time.
-  let customerId
-  try {
-    const clerkUser = await clerk.users.getUser(userId)
-    customerId = clerkUser.privateMetadata?.stripeCustomerId
-  } catch {
-    // ignore - fall through to email lookup / create
-  }
+  let customerId = user.privateMetadata?.stripeCustomerId
 
   if (!customerId) {
     const existing = await stripe.customers.list({ email: userEmail, limit: 1 })

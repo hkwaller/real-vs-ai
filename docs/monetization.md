@@ -1,3 +1,5 @@
+> Historical implementation notes. Superseded on 11 October 2026: Adsterra was completely removed. No web ads are active. See `adsense-readiness.md` for the current policy; do not re-enable this provider.
+
 # Monetization: ads + remove-ads
 
 Adsterra ads for free players, plus a Stripe "ad-free" upsell (day pass + monthly + yearly). Built with the `game-monetization` skill.

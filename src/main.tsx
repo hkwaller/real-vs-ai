@@ -21,7 +21,7 @@ const app = (
 // Prerendered routes (see vite.config.js) ship real HTML: hydrate so React 19
 // reconciles the existing <head> metadata instead of appending duplicates.
 // Non-prerendered routes have an empty #root, so fall back to a fresh render.
-if (container.hasChildNodes()) {
+if (container.hasChildNodes() && !container.hasAttribute('data-static-shell')) {
   hydrateRoot(container, app)
 } else {
   createRoot(container).render(app)

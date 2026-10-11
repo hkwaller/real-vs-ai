@@ -40,7 +40,7 @@ const PERKS = [
 
 const GoAdFree: React.FC = () => {
   const { user, isLoaded } = useUser()
-  const { userId } = useAuth()
+  const { userId, getToken } = useAuth()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const [loadingPlan, setLoadingPlan] = useState<Plan | 'portal' | null>(null)
@@ -74,14 +74,14 @@ const GoAdFree: React.FC = () => {
   }, [status, user, adFree, polling])
 
   const startCheckout = async (plan: Plan) => {
-    const email = user?.emailAddresses?.[0]?.emailAddress
-    if (!userId || !email) return
+    if (!userId) return
     setLoadingPlan(plan)
     try {
+      const token = await getToken()
       const res = await fetch('/api/create-checkout-session', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, userEmail: email, plan }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ plan }),
       })
       const data = await res.json()
       if (data.url) window.location.href = data.url
@@ -96,13 +96,12 @@ const GoAdFree: React.FC = () => {
   }
 
   const manageSubscription = async () => {
-    const email = user?.emailAddresses?.[0]?.emailAddress
     setLoadingPlan('portal')
     try {
+      const token = await getToken()
       const res = await fetch('/api/create-portal-session', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, userEmail: email }),
+        headers: { Authorization: `Bearer ${token}` },
       })
       const data = await res.json()
       if (data.url) window.location.href = data.url

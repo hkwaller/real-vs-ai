@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useUser, UserButton } from '@clerk/react'
+import { useUser, useAuth, UserButton } from '@clerk/react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ type GameRecord = {
 
 const Dashboard: React.FC = () => {
   const { user, isLoaded } = useUser()
+  const { getToken } = useAuth()
   const { isAdFree, adFreeUntil, plan, subscriptionActive } = useAdFree()
   const navigate = useNavigate()
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
@@ -44,11 +45,10 @@ const Dashboard: React.FC = () => {
   const handleManageBilling = async () => {
     setLoadingAction('portal')
     try {
-      const email = user.emailAddresses[0]?.emailAddress
+      const token = await getToken()
       const res = await fetch('/api/create-portal-session', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, userEmail: email }),
+        headers: { Authorization: `Bearer ${token}` },
       })
       const data = await res.json()
       if (data.url) window.location.href = data.url
@@ -134,12 +134,10 @@ const Dashboard: React.FC = () => {
                 <div>
                   <p className="mission-label mb-0.5">Status</p>
                   <div className="font-orbitron font-bold text-[#F5F0E8]">Free Plan</div>
-                  <p className="font-space-mono text-xs text-[#8B97C8] mt-0.5">Ads shown during games</p>
+                  <p className="font-space-mono text-xs text-[#8B97C8] mt-0.5">No web advertising</p>
                 </div>
               </div>
-              <Button size="sm" onClick={() => navigate('/go-ad-free')}>
-                Go ad-free
-              </Button>
+
             </div>
           )}
         </motion.div>
@@ -268,29 +266,7 @@ const Dashboard: React.FC = () => {
           )
         })()}
 
-        {/* Go ad-free CTA */}
-        {!isAdFree && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="corner-bracket bg-[#111840] border border-[#FF6B1A]/40 p-6 flex items-center justify-between flex-wrap gap-4 pb-4"
-          >
-            <div>
-              <p className="mission-label mb-1">Upgrade</p>
-              <h2 className="font-orbitron text-2xl font-black text-[#FF6B1A] uppercase text-glow-orange">
-                Go ad-free
-              </h2>
-              <p className="text-[#8B97C8] text-sm mt-1">
-                Day pass from 19 kr, or subscribe. Hosts make the whole room ad-free.
-              </p>
-            </div>
-            <Button size="lg" onClick={() => navigate('/go-ad-free')}>
-              <Zap className="w-4 h-4 mr-2" />
-              See options
-            </Button>
-          </motion.div>
-        )}
+
       </div>
     </GameLayout>
   )

@@ -1,5 +1,5 @@
 import Stripe from 'stripe'
-import { createClerkClient } from '@clerk/backend'
+import { createClerkClient, verifyToken } from '@clerk/backend'
 
 const baseUrl =
   process.env.APP_URL ||
@@ -7,29 +7,37 @@ const baseUrl =
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY })
 
+// Resolve the caller from their Clerk session token - never trust ids in the body.
+async function getAuthedUser(req) {
+  const token = req.headers.authorization?.replace(/^Bearer /, '')
+  if (!token) return null
+  try {
+    const { sub } = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY })
+    return await clerk.users.getUser(sub)
+  } catch {
+    return null
+  }
+}
+
+const primaryEmail = (user) =>
+  user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId)?.emailAddress ??
+  user.emailAddresses[0]?.emailAddress
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { userId, userEmail } = req.body
-
-  if (!userId && !userEmail) {
-    return res.status(400).json({ error: 'Missing userId or userEmail' })
+  const user = await getAuthedUser(req)
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' })
   }
+  const userEmail = primaryEmail(user)
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
   // Prefer the customer id cached on the Clerk user; fall back to email lookup.
-  let customerId
-  if (userId) {
-    try {
-      const clerkUser = await clerk.users.getUser(userId)
-      customerId = clerkUser.privateMetadata?.stripeCustomerId
-    } catch {
-      // ignore
-    }
-  }
+  let customerId = user.privateMetadata?.stripeCustomerId
 
   if (!customerId && userEmail) {
     const customers = await stripe.customers.list({ email: userEmail, limit: 1 })

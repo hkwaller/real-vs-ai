@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { publicPages } from './public-pages.mjs'
 import path from 'path'
 import { promises as fs } from 'node:fs'
 
@@ -10,12 +11,12 @@ import { promises as fs } from 'node:fs'
 // work — no headless browser, so it always builds on Vercel). Tags carry
 // Helmet's `data-rh="true"` markers, so when the SPA mounts, react-helmet
 // *adopts* them instead of appending duplicates. Non-JS crawlers / OG scrapers
-// get the tags directly; Googlebot renders the JS for the rest.
+// receive metadata and useful static public content before JavaScript runs.
 //
 // Only content-stable routes are emitted. /daily* is deliberately excluded
 // (its content changes daily) and relies on client-side Helmet.
 
-const SITE_URL = 'https://real-vs-ai.buzz'
+const SITE_URL = 'https://realvsai.playam.app'
 const SITE_NAME = 'Real or AI'
 const OG_IMAGE = `${SITE_URL}/og-image.png`
 const DEFAULT_DESCRIPTION =
@@ -26,11 +27,8 @@ const ROUTES = {
     title: 'Real or AI - Spot the fake. Beat your friends.',
     description: DEFAULT_DESCRIPTION,
   },
-  '/go-ad-free': {
-    title: 'Go Ad-Free - Real or AI',
-    description:
-      'Remove ads and support Real or AI. Get an ad-free pass and enjoy uninterrupted rounds of spotting the fake.',
-  },
+  '/privacy': { title: 'Privacy - Real vs AI', description: 'How Real vs AI handles your information.' },
+  '/terms': { title: 'Terms - Real vs AI', description: 'Terms for playing Real vs AI.' },
 }
 
 const esc = (s) =>
@@ -75,7 +73,7 @@ function staticSeo() {
       order: 'post',
       handler(html) {
         // Inject the home route's meta into the main index.html.
-        return html.replace('</head>', metaBlock('/', ROUTES['/']) + '</head>')
+        return html.replace('</head>', metaBlock('/', ROUTES['/']) + '</head>').replace('<div id="root"></div>', `<div id="root" data-static-shell="true">${publicPages['/']}</div>`)
       },
     },
     async writeBundle(options) {
@@ -86,7 +84,7 @@ function staticSeo() {
         const html = base.replace(
           /<!--seo-->[\s\S]*?<!--\/seo-->/,
           metaBlock(routePath, meta),
-        )
+        ).replace(/<div id="root" data-static-shell="true">[\s\S]*?<\/div>/, `<div id="root" data-static-shell="true">${publicPages[routePath]}</div>`)
         const dir = path.join(outDir, routePath.replace(/^\//, ''))
         await fs.mkdir(dir, { recursive: true })
         await fs.writeFile(path.join(dir, 'index.html'), html)

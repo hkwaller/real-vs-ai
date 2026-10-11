@@ -1,3 +1,5 @@
+// Future monetization boundary: only after the entire session has completed and final results are visible.
+// Consult playam-monetization.monetizationBreakReached; no ad SDK or event is invoked here.
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'

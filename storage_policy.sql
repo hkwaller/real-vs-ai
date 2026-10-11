@@ -1,25 +1,17 @@
--- Allow public access to list files in the 'real-vs-ai' bucket
--- This is required for the game to find images to display
+-- Storage policies for the 'real-vs-ai' bucket.
+--
+-- Anyone may list and read (the game lists real/ to find image pairs and loads
+-- them by public URL). There are deliberately NO insert/update/delete policies:
+-- writes go through api/admin-storage.js, which checks the caller is a Clerk
+-- admin and uses the service-role key (bypasses RLS). Do not add 'authenticated'
+-- write policies here - this Supabase project is shared with other apps.
+
 create policy "Allow public listing of real-vs-ai bucket"
 on storage.objects for select
 to public
 using ( bucket_id = 'real-vs-ai' );
 
--- Allow public access to upload files to the 'real-vs-ai' bucket
-create policy "Allow public uploading to real-vs-ai bucket"
-on storage.objects for insert
-to public
-with check ( bucket_id = 'real-vs-ai' );
-
--- Allow public access to update files in the 'real-vs-ai' bucket
-create policy "Allow public updating in real-vs-ai bucket"
-on storage.objects for update
-to public
-using ( bucket_id = 'real-vs-ai' )
-with check ( bucket_id = 'real-vs-ai' );
-
--- Allow public access to delete files in the 'real-vs-ai' bucket
-create policy "Allow public deleting in real-vs-ai bucket"
-on storage.objects for delete
-to public
-using ( bucket_id = 'real-vs-ai' );
+-- Migration from the old open-write policies:
+drop policy if exists "Allow public uploading to real-vs-ai bucket" on storage.objects;
+drop policy if exists "Allow public updating in real-vs-ai bucket" on storage.objects;
+drop policy if exists "Allow public deleting in real-vs-ai bucket" on storage.objects;
