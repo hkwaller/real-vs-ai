@@ -9,6 +9,14 @@
       "destination": "https://eu.i.posthog.com/:path*"
     },
     {
+      "source": "/daily",
+      "destination": "/daily/index.html"
+    },
+    {
+      "source": "/daily/archive",
+      "destination": "/daily/archive/index.html"
+    },
+    {
       "source": "/privacy",
       "destination": "/privacy/index.html"
     },

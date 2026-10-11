@@ -13,8 +13,8 @@ import { promises as fs } from 'node:fs'
 // *adopts* them instead of appending duplicates. Non-JS crawlers / OG scrapers
 // receive metadata and useful static public content before JavaScript runs.
 //
-// Only content-stable routes are emitted. /daily* is deliberately excluded
-// (its content changes daily) and relies on client-side Helmet.
+// Daily routes get stable rules and navigation in their static shell.
+// Live challenge data continues to load in the client.
 
 const SITE_URL = 'https://realvsai.playam.app'
 const SITE_NAME = 'Real or AI'
@@ -27,6 +27,8 @@ const ROUTES = {
     title: 'Real or AI - Spot the fake. Beat your friends.',
     description: DEFAULT_DESCRIPTION,
   },
+  '/daily': { title: 'Daily Challenge - Real or AI', description: 'Play a fresh Real-or-AI challenge each day. Compare photographs, spot the AI-generated image and build your streak.' },
+  '/daily/archive': { title: 'Daily Challenge Archive - Real or AI', description: 'Browse and replay past Real-or-AI daily challenges. Practise spotting AI-generated photos.' },
   '/privacy': { title: 'Privacy - Real vs AI', description: 'How Real vs AI handles your information.' },
   '/terms': { title: 'Terms - Real vs AI', description: 'Terms for playing Real vs AI.' },
 }
