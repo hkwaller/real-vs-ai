@@ -1,13 +1,6 @@
-import React from 'react'
-import { SignUp } from '@clerk/react'
-import GameLayout from '@/components/GameLayout'
+import { Navigate, useLocation } from 'react-router-dom'
 
-const SignUpPage: React.FC = () => (
-  <GameLayout>
-    <div className="flex justify-center">
-      <SignUp routing="path" path="/sign-up" fallbackRedirectUrl="/dashboard" />
-    </div>
-  </GameLayout>
-)
-
-export default SignUpPage
+export default function SignUpPage() {
+  const { search } = useLocation()
+  return <Navigate to={`/sign-in${search}`} replace />
+}

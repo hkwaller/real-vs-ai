@@ -245,7 +245,7 @@ const GoAdFree: React.FC = () => {
                       )}
                     </Button>
                   ) : (
-                    <SignInButton mode="modal">
+                    <SignInButton withSignUp mode="modal">
                       <Button
                         className="w-full mt-auto"
                         variant={tier.badge ? 'default' : 'secondary'}

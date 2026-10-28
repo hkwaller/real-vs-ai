@@ -28,5 +28,62 @@
       "source": "/((?!api/|@|.*\\.[a-zA-Z0-9]+$).*)",
       "destination": "/index.html"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "realvsai.buzz"
+        }
+      ],
+      "destination": "https://realvsai.playam.app/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.realvsai.buzz"
+        }
+      ],
+      "destination": "https://realvsai.playam.app/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "real-vs-ai.buzz"
+        }
+      ],
+      "destination": "https://realvsai.playam.app/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.real-vs-ai.buzz"
+        }
+      ],
+      "destination": "https://realvsai.playam.app/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "real-vs-ai.playam.app"
+        }
+      ],
+      "destination": "https://realvsai.playam.app/:path*",
+      "permanent": true
+    }
   ]
 }

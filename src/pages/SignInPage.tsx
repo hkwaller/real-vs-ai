@@ -5,7 +5,7 @@ import GameLayout from '@/components/GameLayout'
 const SignInPage: React.FC = () => (
   <GameLayout>
     <div className="flex justify-center">
-      <SignIn routing="path" path="/sign-in" fallbackRedirectUrl="/dashboard" />
+      <SignIn withSignUp routing="path" path="/sign-in" fallbackRedirectUrl="/dashboard" />
     </div>
   </GameLayout>
 )
