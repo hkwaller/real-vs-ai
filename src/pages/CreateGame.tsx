@@ -1,11 +1,10 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { useAuth } from '@clerk/react'
 import { Button } from '@/components/ui/button'
-import GameLayout from '@/components/GameLayout'
 import Seo from '@/components/Seo'
-import { Loader2, Minus, Plus, Gift } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
+import { ArrowRight, Wordmark } from '@/components/Brand'
 
 const FREE_GAME_LIMIT = 3
 const GAMES_CREATED_KEY = 'rvai_games_created'
@@ -17,29 +16,45 @@ const Stepper: React.FC<{
   onChange: (n: number) => void
   min: number
   max: number
-}> = ({ value, onChange, min, max }) => (
-  <div className="flex items-center gap-3">
+  labelId: string
+  less: string
+  more: string
+}> = ({ value, onChange, min, max, labelId, less, more }) => (
+  <div
+    role="group"
+    aria-labelledby={labelId}
+    className="flex items-stretch h-24 border-4 border-ink bg-paper text-ink"
+  >
     <button
       type="button"
       onClick={() => onChange(clamp(value - 1, min, max))}
-      className="w-11 h-11 rounded-[14px] bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#FFF8F0] transition-colors disabled:opacity-40"
+      className="w-24 border-r-4 border-ink type-display text-[44px] hover:bg-ink hover:text-paper transition-colors disabled:text-text-placeholder disabled:bg-paper disabled:cursor-not-allowed"
       disabled={value <= min}
-      aria-label="Decrease"
+      aria-label={less}
     >
-      <Minus className="w-5 h-5" />
+      −
     </button>
-    <span className="font-display font-extrabold text-[28px] text-[#FFF8F0] w-12 text-center tabular-nums">
+    <span className="flex-1 flex items-center justify-center type-display text-[64px] tabular-nums">
       {value}
     </span>
     <button
       type="button"
       onClick={() => onChange(clamp(value + 1, min, max))}
-      className="w-11 h-11 rounded-[14px] bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#FFF8F0] transition-colors disabled:opacity-40"
+      className="w-24 border-l-4 border-ink type-display text-[44px] hover:bg-ink hover:text-paper transition-colors disabled:text-text-placeholder disabled:bg-paper disabled:cursor-not-allowed"
       disabled={value >= max}
-      aria-label="Increase"
+      aria-label={more}
     >
-      <Plus className="w-5 h-5" />
+      +
     </button>
+  </div>
+)
+
+const FieldHead: React.FC<{ id: string; title: string; hint: string }> = ({ id, title, hint }) => (
+  <div className="flex items-baseline justify-between gap-4">
+    <span id={id} className="type-name text-[26px]">
+      {title}
+    </span>
+    <span className="font-semibold text-base text-text-muted text-right">{hint}</span>
   </div>
 )
 
@@ -71,128 +86,138 @@ const CreateGame: React.FC = () => {
 
   if (atFreeLimit) {
     return (
-      <GameLayout>
+      <main className="min-h-dvh bg-side-b text-paper flex flex-col">
         <Seo title="Create a game - Real or AI" path="/create" noindex />
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-[460px] mx-auto"
-        >
-          <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-8 text-center space-y-6">
-            <div className="w-16 h-16 rounded-[20px] bg-[#FFC94D]/15 flex items-center justify-center mx-auto">
-              <Gift className="w-8 h-8 text-[#FFC94D]" />
-            </div>
-            <div>
-              <h2 className="font-display font-extrabold text-2xl text-[#FFF8F0]">
-                You've used your free games
-              </h2>
-              <p className="text-[#9AA3D0] text-sm mt-3">
-                Create a free account to keep the parties going - or go Pro to remove ads.
-              </p>
-            </div>
-            <div className="space-y-3">
-              <Button size="lg" className="w-full" onClick={() => navigate('/sign-up')}>
-                Create free account
-              </Button>
-              <Button
-                variant="ghost"
-                size="lg"
-                className="w-full"
-                onClick={() => navigate('/dashboard')}
-              >
-                View Pro plans
-              </Button>
-              <button
-                onClick={() => navigate('/')}
-                className="font-body text-sm text-[#6E77A8] hover:text-[#FFF8F0] transition-colors"
-              >
-                ← Back home
-              </button>
-            </div>
+        <div className="flex-1 w-full max-w-3xl mx-auto px-4 md:px-14 py-10 flex flex-col gap-10">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="self-start py-3 type-label text-base"
+          >
+            <Wordmark className="text-xl" />
+          </button>
+          <div className="flex flex-col gap-5 mt-auto">
+            <h1 className="type-display text-[clamp(48px,8vw,96px)] leading-[0.88]">
+              Free games used up.
+            </h1>
+            <p className="text-xl font-medium leading-snug text-on-blue-muted max-w-[34ch]">
+              Make a free account to keep the parties going, or go Pro to remove ads.
+            </p>
           </div>
-        </motion.div>
-      </GameLayout>
+          <div className="flex flex-col sm:flex-row gap-3 mb-auto">
+            <Button size="lg" onClick={() => navigate('/sign-up')}>
+              Create free account <ArrowRight />
+            </Button>
+            <Button variant="outline" size="lg" onClick={() => navigate('/dashboard')}>
+              View Pro plans
+            </Button>
+          </div>
+        </div>
+      </main>
     )
   }
 
+  const minutes = Math.max(1, Math.round((rounds * (timeLimit + 8)) / 60))
+
   return (
-    <GameLayout>
+    <main className="min-h-dvh grid grid-cols-1 lg:grid-cols-2 bg-paper text-ink">
       <Seo title="Create a game - Real or AI" path="/create" noindex />
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-[460px] mx-auto"
-      >
-        <div className="text-center mb-8">
-          <h1 className="font-display font-extrabold text-4xl text-[#FFF8F0]">Set up your party</h1>
-          <p className="text-[#9AA3D0] mt-2">Two knobs and you're off</p>
+      <section className="bg-side-a text-ink px-4 md:px-14 py-8 md:py-12 flex flex-col justify-between gap-12">
+        <div className="flex items-center justify-between type-label text-base">
+          <button type="button" onClick={() => navigate('/')} className="py-3">
+            <Wordmark className="text-xl" />
+          </button>
+          <button type="button" onClick={() => navigate('/')} className="py-3 underline underline-offset-4">
+            Back
+          </button>
+        </div>
+        <div className="flex flex-col gap-6">
+          <h1 className="type-display text-[clamp(56px,7vw,112px)] leading-[0.88]">
+            Set up
+            <br />
+            your party.
+          </h1>
+          <p className="text-xl font-medium leading-snug max-w-[30ch]">
+            Two numbers and one switch. Put this screen on the TV, then everyone joins from their
+            phone.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2.5 type-label text-base">
+          <span className="bg-ink text-paper px-3.5 py-2.5">{rounds} rounds</span>
+          <span className="bg-ink text-paper px-3.5 py-2.5">{timeLimit} sec each</span>
+          <span className="bg-ink text-paper px-3.5 py-2.5">About {minutes} min</span>
+        </div>
+      </section>
+
+      <section className="px-4 md:px-14 py-8 md:py-12 flex flex-col justify-center gap-8">
+        <div className="flex flex-col gap-3">
+          <FieldHead id="rounds-label" title="Rounds" hint="How many photo pairs" />
+          <Stepper
+            value={rounds}
+            onChange={setRounds}
+            min={1}
+            max={20}
+            labelId="rounds-label"
+            less="Fewer rounds"
+            more="More rounds"
+          />
         </div>
 
-        <div className="rounded-[24px] border border-white/[0.07] bg-[#1F2450] p-6">
-          {/* Rounds */}
-          <div className="flex items-center justify-between py-5">
-            <div>
-              <p className="font-display font-bold text-[#FFF8F0]">Rounds</p>
-              <p className="text-[#9AA3D0] text-sm">How many photo pairs</p>
-            </div>
-            <Stepper value={rounds} onChange={setRounds} min={1} max={20} />
-          </div>
+        <div className="flex flex-col gap-3">
+          <FieldHead id="seconds-label" title="Seconds" hint="Less time, more chaos" />
+          <Stepper
+            value={timeLimit}
+            onChange={setTimeLimit}
+            min={5}
+            max={60}
+            labelId="seconds-label"
+            less="Less time"
+            more="More time"
+          />
+        </div>
 
-          <div className="h-px bg-white/[0.07]" />
-
-          {/* Seconds per round */}
-          <div className="flex items-center justify-between py-5">
-            <div>
-              <p className="font-display font-bold text-[#FFF8F0]">Seconds per round</p>
-              <p className="text-[#9AA3D0] text-sm">Faster = more chaos</p>
-            </div>
-            <Stepper value={timeLimit} onChange={setTimeLimit} min={5} max={60} />
-          </div>
-
-          <div className="h-px bg-white/[0.07]" />
-
-          {/* Show votes */}
-          <div className="py-5">
-            <p className="font-display font-bold text-[#FFF8F0] mb-3">Show votes</p>
-            <div className="grid grid-cols-2 gap-2 rounded-[16px] bg-white/5 p-1">
-              {(
-                [
-                  { mode: 'instant', label: 'Live 👀' },
-                  { mode: 'after_round', label: 'At the end 🤫' },
-                ] as const
-              ).map(({ mode, label }) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setRevealMode(mode)}
-                  className={`h-11 rounded-[12px] font-display font-bold text-sm transition-all ${
-                    revealMode === mode
-                      ? 'bg-[#57E6D2] text-[#151936]'
-                      : 'text-[#9AA3D0] hover:text-[#FFF8F0]'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[#9AA3D0] text-sm mt-3">
-              Live shows everyone's picks as they happen
-            </p>
+        <div className="flex flex-col gap-3">
+          <FieldHead id="votes-label" title="Show votes" hint="On the TV, during the round" />
+          <div role="group" aria-labelledby="votes-label" className="grid grid-cols-2 h-20 border-4 border-ink">
+            {(
+              [
+                { mode: 'instant', label: 'Live' },
+                { mode: 'after_round', label: 'After the round' },
+              ] as const
+            ).map(({ mode, label }, i) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={revealMode === mode}
+                onClick={() => setRevealMode(mode)}
+                className={`type-name text-[clamp(16px,1.6vw,22px)] transition-colors ${
+                  i > 0 ? 'border-l-4 border-ink' : ''
+                } ${revealMode === mode ? 'bg-ink text-paper' : 'bg-paper text-ink hover:bg-muted'}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
-        <Button size="lg" className="w-full mt-6" onClick={handleCreateGame} disabled={loading}>
+        <Button
+          variant="secondary"
+          className="h-[104px] w-full justify-between px-8 text-[clamp(24px,2.4vw,34px)] [&_svg]:size-9"
+          onClick={handleCreateGame}
+          disabled={loading}
+        >
           {loading ? (
             <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Creating…
+              Opening… <Loader2 className="animate-spin" />
             </>
           ) : (
-            'Create party 🎉'
+            <>
+              Open the lobby <ArrowRight />
+            </>
           )}
         </Button>
-      </motion.div>
-    </GameLayout>
+      </section>
+    </main>
   )
 }
 

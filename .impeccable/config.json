@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/pages/CreateGame.tsx"
+        ],
+        "createdAt": "2026-11-25T14:23:39.851Z",
+        "reason": "Claude: the 4px borders are the dividers between the minus/value/plus cells of the stepper and between the two segmented-toggle options, inside a fully bordered control, as specified by the Real or AI design system (Stepper, Segmented). Not accent bars on cards."
+      }
+    ]
+  }
+}

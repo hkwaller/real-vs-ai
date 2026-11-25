@@ -75,7 +75,7 @@ const GenerateImage: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <ImageIcon className="w-6 h-6 text-indigo-400" />
+              <ImageIcon className="w-6 h-6 text-ink" strokeWidth={2.5} />
               Generate Image
             </CardTitle>
             <CardDescription>Upload an image to generate a new variation</CardDescription>
@@ -83,21 +83,20 @@ const GenerateImage: React.FC = () => {
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">Name</label>
+                <label className="type-label text-sm flex items-center gap-2">Name</label>
                 <Input
                   type="text"
                   placeholder="Enter a name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="bg-slate-900/50"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">Image</label>
+                <label className="type-label text-sm flex items-center gap-2">Image</label>
                 <div
-                  className="border-2 border-dashed border-slate-700 rounded-lg p-6 text-center hover:border-indigo-500 transition-colors cursor-pointer bg-slate-900/30"
+                  className="border-4 border-dashed border-ink p-6 text-center hover:border-side-b transition-colors cursor-pointer bg-paper"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <input
@@ -109,25 +108,25 @@ const GenerateImage: React.FC = () => {
                     required
                   />
                   {file ? (
-                    <div className="text-sm text-indigo-400 font-medium truncate">{file.name}</div>
+                    <div className="text-sm text-ink font-semibold truncate">{file.name}</div>
                   ) : (
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                      <Upload className="w-8 h-8" />
-                      <span className="text-sm">Click to upload image</span>
+                    <div className="flex flex-col items-center gap-2 text-text-muted">
+                      <Upload className="w-8 h-8" strokeWidth={2.5} />
+                      <span className="text-sm font-medium">Click to upload image</span>
                     </div>
                   )}
                 </div>
               </div>
 
               {status === 'success' && (
-                <div className="p-3 bg-green-500/10 border border-green-500/20 rounded text-green-400 text-sm text-center">
+                <div className="p-3 border-4 border-ink text-ink text-sm font-medium text-center space-y-2">
                   Successfully submitted!
                   <br />
                   <div>Here is your fancy prompt</div>
-                  <div className="p-8 bg-gray-800/50 rounded">{prompt}</div>
+                  <div className="p-4 bg-muted text-left break-words">{prompt}</div>
                   <button
                     onClick={() => navigator.clipboard.writeText(prompt)}
-                    className="mt-2 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 rounded text-white text-xs"
+                    className="mt-2 px-3 py-2 bg-side-b text-paper type-label text-xs hover:brightness-[0.92] transition-[filter] cursor-pointer"
                   >
                     Copy Prompt
                   </button>
@@ -135,14 +134,14 @@ const GenerateImage: React.FC = () => {
               )}
 
               {status === 'error' && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-sm text-center">
+                <div className="p-3 bg-ink text-paper text-sm font-medium text-center">
                   Something went wrong. Please try again.
                 </div>
               )}
             </CardContent>
             <CardFooter>
               <Button
-                variant="neon"
+                variant="default"
                 size="lg"
                 className="w-full"
                 type="submit"
@@ -150,12 +149,12 @@ const GenerateImage: React.FC = () => {
               >
                 {loading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="animate-spin" />
                     Sending...
                   </>
                 ) : (
                   <>
-                    <Send className="mr-2 h-4 w-4" />
+                    <Send />
                     Submit
                   </>
                 )}

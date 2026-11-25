@@ -8,6 +8,7 @@ import DailyChallengeCard from '@/components/DailyChallengeCard'
 import { useAdFree } from '@/hooks/useAdFree'
 import { getDailyScores } from '@/lib/dailyChallenge'
 import { Crown, Zap, Trophy, Loader2, Plus, Calendar } from 'lucide-react'
+import { ArrowRight } from '@/components/Brand'
 
 type GameRecord = {
   date: string
@@ -26,7 +27,7 @@ const Dashboard: React.FC = () => {
     return (
       <GameLayout>
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-[#FF6B1A]" />
+          <Loader2 className="w-8 h-8 animate-spin text-ink" strokeWidth={3} />
         </div>
       </GameLayout>
     )
@@ -67,43 +68,43 @@ const Dashboard: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between flex-wrap gap-4"
+          className="flex items-center justify-between flex-wrap gap-4 border-b-4 border-ink pb-6"
         >
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 min-w-0">
             <UserButton />
-            <div>
-              <p className="mission-label mb-0.5">Operative</p>
-              <h1 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase">
+            <div className="min-w-0">
+              <p className="type-label text-xs text-text-muted mb-1">Signed in</p>
+              <h1 className="type-display text-3xl leading-none truncate">
                 {user.firstName ?? 'Dashboard'}
               </h1>
-              <p className="font-space-mono text-xs text-[#8B97C8] mt-0.5">
+              <p className="font-medium text-sm text-text-muted mt-1 truncate">
                 {user.emailAddresses[0]?.emailAddress}
               </p>
             </div>
           </div>
           <Button onClick={() => navigate('/create')}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Mission
+            <Plus className="w-5 h-5" strokeWidth={3} />
+            New game
           </Button>
         </motion.div>
 
         {/* Ad-free status */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           {isAdFree ? (
-            <div className="corner-bracket bg-[#111840] border border-[#FF6B1A]/40 p-5 flex items-center justify-between flex-wrap gap-4">
+            <div className="border-4 border-ink p-5 flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 border border-[#FF6B1A] flex items-center justify-center">
-                  <Crown className="w-6 h-6 text-[#FF6B1A]" />
+                <div className="w-12 h-12 bg-side-a text-ink flex items-center justify-center shrink-0">
+                  <Crown className="w-6 h-6" strokeWidth={2.5} />
                 </div>
                 <div>
-                  <p className="mission-label mb-0.5">Status</p>
-                  <div className="font-orbitron font-bold text-[#F5F0E8] flex items-center gap-3">
+                  <p className="type-label text-xs text-text-muted mb-1">Status</p>
+                  <div className="type-display text-lg leading-none flex items-center gap-3 flex-wrap">
                     {planLabel}
-                    <span className="font-space-mono text-xs bg-[#FF6B1A]/20 text-[#FF6B1A] px-2 py-0.5 border border-[#FF6B1A]/40">
-                      AD-FREE
+                    <span className="type-label text-xs bg-ink text-paper px-2 py-1">
+                      Ad-free
                     </span>
                   </div>
-                  <p className="font-space-mono text-xs text-[#8B97C8] mt-0.5">
+                  <p className="font-medium text-sm text-text-muted mt-1">
                     {adFreeUntil
                       ? `${subscriptionActive ? 'Renews' : 'Until'} ${adFreeUntil.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
                       : 'No ads across the game'}
@@ -112,7 +113,7 @@ const Dashboard: React.FC = () => {
               </div>
               {subscriptionActive && (
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={handleManageBilling}
                   disabled={loadingAction === 'portal'}
@@ -120,21 +121,21 @@ const Dashboard: React.FC = () => {
                   {loadingAction === 'portal' ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    'Manage Billing'
+                    'Manage billing'
                   )}
                 </Button>
               )}
             </div>
           ) : (
-            <div className="corner-bracket bg-[#111840] border border-[#FFB830]/40 p-5 flex items-center justify-between flex-wrap gap-4">
+            <div className="border-4 border-ink p-5 flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 border border-[#FFB830] flex items-center justify-center">
-                  <Zap className="w-6 h-6 text-[#FFB830]" />
+                <div className="w-12 h-12 border-4 border-ink flex items-center justify-center shrink-0">
+                  <Zap className="w-6 h-6 text-ink" strokeWidth={2.5} />
                 </div>
                 <div>
-                  <p className="mission-label mb-0.5">Status</p>
-                  <div className="font-orbitron font-bold text-[#F5F0E8]">Free Plan</div>
-                  <p className="font-space-mono text-xs text-[#8B97C8] mt-0.5">No web advertising</p>
+                  <p className="type-label text-xs text-text-muted mb-1">Status</p>
+                  <div className="type-display text-lg leading-none">Free plan</div>
+                  <p className="font-medium text-sm text-text-muted mt-1">No web advertising</p>
                 </div>
               </div>
 
@@ -144,29 +145,25 @@ const Dashboard: React.FC = () => {
 
         {/* Game history */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <Trophy className="w-5 h-5 text-[#FFB830]" />
+          <div className="border-4 border-ink p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <Trophy className="w-6 h-6 text-ink" strokeWidth={2.5} />
               <div>
-                <p className="mission-label mb-0.5">Records</p>
-                <h2 className="font-orbitron text-lg font-bold text-[#F5F0E8] uppercase tracking-wide">
-                  Mission History
-                </h2>
+                <p className="type-label text-xs text-text-muted mb-1">Records</p>
+                <h2 className="type-display text-2xl leading-none">Game history.</h2>
               </div>
             </div>
 
             {gameHistory.length === 0 ? (
-              <div className="text-center py-10 space-y-3">
-                <p className="font-space-mono text-xs text-[#8B97C8]">// No missions recorded yet</p>
-                <button
-                  className="font-orbitron text-xs text-[#FF6B1A] uppercase tracking-widest hover:text-[#FF8C42] transition-colors"
-                  onClick={() => navigate('/create')}
-                >
-                  Launch First Mission →
-                </button>
+              <div className="text-center py-10 space-y-3 border-t-2 border-ink">
+                <p className="font-medium text-text-muted">No games recorded yet.</p>
+                <Button variant="link" size="sm" onClick={() => navigate('/create')}>
+                  Host your first game
+                  <ArrowRight />
+                </Button>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="border-t-2 border-ink divide-y-2 divide-ink">
                 {gameHistory.map((game, i) => {
                   const winner = game.scores?.[0]
                   return (
@@ -175,14 +172,14 @@ const Dashboard: React.FC = () => {
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.04 }}
-                      className="flex items-center justify-between p-3 bg-[#1A2355] border border-[#2A3468] gap-4 flex-wrap"
+                      className="flex items-center justify-between py-3 gap-4 flex-wrap"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="font-space-mono text-xs text-[#FF6B1A] bg-[#FF6B1A]/10 px-2 py-1 border border-[#FF6B1A]/30 tracking-widest">
+                        <span className="type-label text-xs bg-ink text-paper px-2 py-1 tracking-widest">
                           {game.gameId}
                         </span>
-                        <span className="flex items-center gap-1.5 font-space-mono text-xs text-[#8B97C8]">
-                          <Calendar className="w-3 h-3" />
+                        <span className="flex items-center gap-1.5 type-label text-xs text-text-muted">
+                          <Calendar className="w-3.5 h-3.5" strokeWidth={2.5} />
                           {new Date(game.date).toLocaleDateString(undefined, {
                             month: 'short',
                             day: 'numeric',
@@ -192,13 +189,9 @@ const Dashboard: React.FC = () => {
                       </div>
                       {winner && (
                         <div className="flex items-center gap-2">
-                          <span>🏆</span>
-                          <span className="font-orbitron text-xs font-bold text-[#F5F0E8]">
-                            {winner.emoji} {winner.name}
-                          </span>
-                          <span className="font-space-mono text-xs text-[#FFB830] font-bold">
-                            {winner.score} PTS
-                          </span>
+                          <span className="type-label text-xs text-text-muted">Winner</span>
+                          <span className="type-name text-sm">{winner.name}</span>
+                          <span className="type-label text-xs">{winner.score} PTS</span>
                         </div>
                       )}
                     </motion.div>
@@ -223,36 +216,34 @@ const Dashboard: React.FC = () => {
           if (entries.length === 0) return null
           return (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}>
-              <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <Calendar className="w-5 h-5 text-[#FFB830]" />
+              <div className="border-4 border-ink p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <Calendar className="w-6 h-6 text-ink" strokeWidth={2.5} />
                   <div>
-                    <p className="mission-label mb-0.5">Daily Ops</p>
-                    <h2 className="font-orbitron text-lg font-bold text-[#F5F0E8] uppercase tracking-wide">
-                      Challenge History
-                    </h2>
+                    <p className="type-label text-xs text-text-muted mb-1">Daily</p>
+                    <h2 className="type-display text-2xl leading-none">Challenge history.</h2>
                   </div>
                 </div>
-                <div className="space-y-2">
+                <div className="border-t-2 border-ink divide-y-2 divide-ink">
                   {entries.map(([date, result]) => {
                     const pct = Math.round((result.score / result.maxScore) * 100)
                     return (
-                      <Link key={date} to={`/daily/${date}`} className="block">
-                        <div className="flex items-center justify-between p-3 bg-[#1A2355] border border-[#2A3468] hover:border-[#FFB830]/40 transition-colors gap-4">
-                          <span className="flex items-center gap-1.5 font-space-mono text-xs text-[#8B97C8]">
-                            <Calendar className="w-3 h-3" />
+                      <Link key={date} to={`/daily/${date}`} className="block group">
+                        <div className="flex items-center justify-between py-3 gap-4">
+                          <span className="flex items-center gap-1.5 type-label text-xs text-text-muted group-hover:text-side-b transition-colors">
+                            <Calendar className="w-3.5 h-3.5" strokeWidth={2.5} />
                             {new Date(date + 'T12:00:00').toLocaleDateString(undefined, {
                               month: 'short', day: 'numeric', year: 'numeric',
                             })}
                           </span>
                           <div className="flex items-center gap-3">
-                            <div className="w-20 bg-[#2A3468] h-1.5 hidden sm:block">
+                            <div className="w-20 bg-muted h-2 hidden sm:block">
                               <div
-                                className="bg-[#FFB830] h-1.5 transition-all"
+                                className="bg-side-a h-2 transition-all"
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
-                            <span className="font-space-mono text-xs text-[#FFB830] font-bold">
+                            <span className="type-label text-xs tabular-nums">
                               {result.score}/{result.maxScore}
                             </span>
                           </div>

@@ -26,6 +26,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Upload,
+  Check,
 } from 'lucide-react'
 
 interface ImagePair {
@@ -471,16 +472,16 @@ const AdminView: React.FC = () => {
     <GameLayout>
       <div className="max-w-6xl mx-auto space-y-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
+          <h1 className="type-display text-4xl leading-none mb-6">Admin dashboard.</h1>
 
           {/* Tab bar */}
-          <div className="flex gap-1 p-1 bg-white/5 rounded-xl border border-white/10 w-fit mb-6">
+          <div className="flex w-fit mb-6 border-4 border-ink">
             <button
               onClick={() => setActiveTab('images')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2.5 type-label text-sm transition-colors cursor-pointer ${
                 activeTab === 'images'
-                  ? 'bg-white/10 text-white'
-                  : 'text-muted-foreground hover:text-white'
+                  ? 'bg-ink text-paper'
+                  : 'text-ink hover:bg-muted'
               }`}
             >
               <ImageIcon className="w-4 h-4" />
@@ -488,10 +489,10 @@ const AdminView: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('daily')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2.5 type-label text-sm transition-colors cursor-pointer ${
                 activeTab === 'daily'
-                  ? 'bg-amber-500/20 text-amber-400'
-                  : 'text-muted-foreground hover:text-white'
+                  ? 'bg-ink text-paper'
+                  : 'text-ink hover:bg-muted'
               }`}
             >
               <Calendar className="w-4 h-4" />
@@ -504,17 +505,17 @@ const AdminView: React.FC = () => {
               {/* Upload Section */}
               <div className="lg:col-span-1 space-y-6">
                 {/* Real Image Upload */}
-                <Card className="text-white">
+                <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <ImageIcon className="w-5 h-5 text-indigo-400" />
+                      <ImageIcon className="w-5 h-5 text-ink" strokeWidth={2.5} />
                       Step 1: Real Image
                     </CardTitle>
                     <CardDescription>Paste an Unsplash URL to fetch & crop</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Image URL</label>
+                      <label className="type-label text-sm">Image URL</label>
                       <div className="flex gap-2">
                         <Input
                           type="url"
@@ -527,7 +528,7 @@ const AdminView: React.FC = () => {
                             setPreviewError(null)
                             setUploadStatus('idle')
                           }}
-                          className="bg-slate-900/50 text-xs"
+                          className="h-11 px-3 text-sm"
                         />
                         <Button
                           type="button"
@@ -547,14 +548,14 @@ const AdminView: React.FC = () => {
                     </div>
 
                     {previewError && (
-                      <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-xs">
+                      <div className="p-3 bg-ink text-paper font-medium text-xs">
                         {previewError}
                       </div>
                     )}
 
                     {previewDataUrl && (
                       <div className="space-y-3">
-                        <div className="aspect-square rounded-lg overflow-hidden border border-white/10">
+                        <div className="aspect-square overflow-hidden border-4 border-ink">
                           <img
                             src={previewDataUrl}
                             alt="Preview"
@@ -568,10 +569,10 @@ const AdminView: React.FC = () => {
                     )}
 
                     {uploadStatus === 'success' && (
-                      <div className="p-3 bg-green-500/10 border border-green-500/20 rounded text-green-400 text-xs space-y-2">
+                      <div className="p-3 border-4 border-ink text-ink font-medium text-xs space-y-2">
                         <div className="font-bold">Prompt returned - use this in Gemini:</div>
                         <div
-                          className="bg-slate-900/50 p-2 rounded font-mono break-words cursor-pointer hover:bg-slate-900/80 transition-colors select-all"
+                          className="bg-muted p-2 break-words cursor-pointer hover:brightness-95 transition-[filter] select-all"
                           title="Click to select all"
                           onClick={(e) => {
                             const range = document.createRange()
@@ -584,28 +585,28 @@ const AdminView: React.FC = () => {
                         </div>
                         <p className="text-muted-foreground">
                           File saved as{' '}
-                          <span className="font-mono text-white">{generatedName}.jpg</span>
+                          <span className="text-ink font-semibold">{generatedName}.jpg</span>
                         </p>
                       </div>
                     )}
 
                     {uploadStatus === 'error' && (
-                      <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-xs text-center">
+                      <div className="p-3 bg-ink text-paper font-medium text-xs text-center">
                         Pipeline failed - check n8n.
                       </div>
                     )}
                   </CardContent>
                   <CardFooter>
                     <Button
-                      variant="neon"
+                      variant="default"
                       className="w-full"
                       onClick={handleUpload}
                       disabled={uploadLoading || !previewBlob}
                     >
                       {uploadLoading ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="h-5 w-5 animate-spin" />
                       ) : (
-                        <Send className="mr-2 h-4 w-4" />
+                        <Send className="h-5 w-5" />
                       )}
                       Send to n8n
                     </Button>
@@ -613,10 +614,10 @@ const AdminView: React.FC = () => {
                 </Card>
 
                 {/* AI Image Upload */}
-                <Card className="text-white">
+                <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <ImageIcon className="w-5 h-5 text-purple-400" />
+                      <ImageIcon className="w-5 h-5 text-ink" strokeWidth={2.5} />
                       Step 2: AI Image
                     </CardTitle>
                     <CardDescription>Upload generated AI image</CardDescription>
@@ -624,9 +625,9 @@ const AdminView: React.FC = () => {
                   <form onSubmit={handleAiUpload}>
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">AI Image</label>
+                        <label className="type-label text-sm">AI Image</label>
                         <div
-                          className="border-2 border-dashed border-slate-700 rounded-lg p-4 text-center hover:border-purple-500 transition-colors cursor-pointer bg-slate-900/30"
+                          className="border-4 border-dashed border-ink p-4 text-center hover:border-side-b transition-colors cursor-pointer bg-paper"
                           onClick={() => aiFileInputRef.current?.click()}
                         >
                           <input
@@ -638,7 +639,7 @@ const AdminView: React.FC = () => {
                             required
                           />
                           {aiFile ? (
-                            <div className="text-sm text-purple-400 font-medium truncate">
+                            <div className="text-sm text-ink font-semibold truncate">
                               {aiFile.name}
                             </div>
                           ) : (
@@ -651,14 +652,14 @@ const AdminView: React.FC = () => {
                       </div>
 
                       {aiUploadStatus === 'success' && (
-                        <div className="p-3 bg-green-500/10 border border-green-500/20 rounded text-green-400 text-xs space-y-1">
+                        <div className="p-3 border-4 border-ink text-ink font-medium text-xs space-y-1">
                           <div className="font-bold">AI image uploaded!</div>
                           {aiCompressedKb && (
-                            <div className="text-muted-foreground font-mono">
+                            <div className="text-muted-foreground">
                               {aiCompressedKb.before > 1024
                                 ? `${(aiCompressedKb.before / 1024).toFixed(1)} MB`
                                 : `${aiCompressedKb.before} KB`}{' '}
-                              → <span className="text-green-400">{aiCompressedKb.after} KB</span> (
+                              → <span className="text-ink font-semibold">{aiCompressedKb.after} KB</span> (
                               {Math.round((1 - aiCompressedKb.after / aiCompressedKb.before) * 100)}
                               % smaller)
                             </div>
@@ -666,7 +667,7 @@ const AdminView: React.FC = () => {
                           {aiAssignedDate && (
                             <div className="text-muted-foreground">
                               Auto-assigned to{' '}
-                              <span className="text-green-400 font-medium">
+                              <span className="text-ink font-semibold">
                                 {new Date(aiAssignedDate + 'T12:00:00').toLocaleDateString(
                                   undefined,
                                   {
@@ -682,17 +683,17 @@ const AdminView: React.FC = () => {
                       )}
 
                       {aiUploadStatus === 'error' && (
-                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-xs text-center">
+                        <div className="p-3 bg-ink text-paper font-medium text-xs text-center">
                           Upload failed.
                         </div>
                       )}
                     </CardContent>
                     <CardFooter>
-                      <Button className="w-full border-purple-500 bg-purple-500" type="submit">
+                      <Button variant="secondary" className="w-full" type="submit">
                         {aiUploadLoading ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
-                          <Send className="mr-2 h-4 w-4" />
+                          <Send className="h-5 w-5" />
                         )}
                         Upload AI
                       </Button>
@@ -703,7 +704,7 @@ const AdminView: React.FC = () => {
 
               {/* List Section */}
               <div className="lg:col-span-2">
-                <Card className="h-full text-white">
+                <Card className="h-full">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Existing Images</CardTitle>
@@ -731,12 +732,12 @@ const AdminView: React.FC = () => {
                         {images.map((img) => (
                           <div
                             key={img.name}
-                            className="bg-slate-900/50 rounded-lg p-3 border border-white/10 space-y-3 cursor-pointer hover:border-indigo-500/50 transition-colors"
+                            className="bg-paper p-3 border-4 border-ink space-y-3 cursor-pointer hover:border-side-b transition-colors"
                             onClick={() => setSelectedPair(img)}
                           >
                             <div className="flex items-center justify-between">
                               <span
-                                className="font-medium truncate flex-1 text-white"
+                                className="font-semibold truncate flex-1 text-ink"
                                 title={img.name}
                               >
                                 {img.name}
@@ -745,7 +746,7 @@ const AdminView: React.FC = () => {
                                 <Button
                                   variant="destructive"
                                   size="icon"
-                                  className="h-8 w-8"
+                                  className="h-10 w-10"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     handleDelete(img.name)
@@ -761,7 +762,7 @@ const AdminView: React.FC = () => {
                                 <Button
                                   variant="outline"
                                   size="icon"
-                                  className="h-8 w-8 border-purple-500/50 hover:bg-purple-500/10 text-purple-400"
+                                  className="h-10 w-10 text-ink"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     handleReplaceAiClick(img.name)
@@ -789,19 +790,19 @@ const AdminView: React.FC = () => {
                                     <div className="text-xs text-muted-foreground text-center capitalize">
                                       {side}
                                     </div>
-                                    <div className="aspect-square rounded overflow-hidden bg-black/20 relative">
+                                    <div className="aspect-square overflow-hidden bg-muted relative border-2 border-ink">
                                       {isMissing ? (
                                         <button
-                                          className="w-full h-full flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-red-500/40 hover:border-red-400/70 bg-red-500/5 hover:bg-red-500/10 transition-colors"
+                                          className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-ink text-paper hover:brightness-125 transition-[filter] cursor-pointer"
                                           onClick={(e) => handleMissingSlotClick(img.name, side, e)}
                                           title={`Upload missing ${side} image`}
                                         >
                                           {isUploading ? (
-                                            <Loader2 className="w-5 h-5 animate-spin text-red-400" />
+                                            <Loader2 className="w-5 h-5 animate-spin text-paper" />
                                           ) : (
                                             <>
-                                              <Upload className="w-5 h-5 text-red-400" />
-                                              <span className="text-xs text-red-400 font-medium">
+                                              <Upload className="w-5 h-5 text-paper" strokeWidth={2.5} />
+                                              <span className="type-label text-xs text-paper">
                                                 Missing
                                               </span>
                                             </>
@@ -832,19 +833,19 @@ const AdminView: React.FC = () => {
 
           {activeTab === 'daily' && (
             <>
-              <h2 className="text-xl font-semibold mb-4 text-amber-400 flex items-center gap-2">
+              <h2 className="type-display text-2xl mb-4 flex items-center gap-2">
                 <Calendar className="w-5 h-5" />
                 Daily Challenges
               </h2>
 
               {scheduleLoading ? (
                 <div className="flex justify-center py-10">
-                  <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
+                  <Loader2 className="w-8 h-8 animate-spin text-ink" strokeWidth={3} />
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Left: Create / Edit */}
-                  <Card className="text-white">
+                  <Card>
                     <CardHeader>
                       <CardTitle className="text-lg">
                         {schedule[selectedDate] ? 'Edit Challenge' : 'New Challenge'}
@@ -853,7 +854,7 @@ const AdminView: React.FC = () => {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Date</label>
+                        <label className="type-label text-sm">Date</label>
                         <Input
                           type="date"
                           value={selectedDate}
@@ -862,15 +863,14 @@ const AdminView: React.FC = () => {
                             setSelectedImages(schedule[e.target.value]?.images ?? [])
                             setScheduleStatus('idle')
                           }}
-                          className="bg-slate-900/50"
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">
+                        <label className="type-label text-sm">
                           Images{' '}
                           <span
-                            className={`text-xs ${selectedImages.length > 0 ? 'text-amber-400' : 'text-muted-foreground'}`}
+                            className={`text-xs ${selectedImages.length > 0 ? 'text-ink font-semibold' : 'text-muted-foreground'}`}
                           >
                             ({selectedImages.length} selected)
                           </span>
@@ -896,25 +896,25 @@ const AdminView: React.FC = () => {
                                   role="checkbox"
                                   aria-checked={checked}
                                   onClick={() => !disabled && toggleImageSelection(img.name)}
-                                  className={`flex items-center gap-3 p-2 rounded-lg border transition-colors select-none ${
+                                  className={`flex items-center gap-3 p-2 border-2 transition-colors select-none ${
                                     disabled
-                                      ? 'border-white/5 opacity-40 cursor-not-allowed'
+                                      ? 'border-muted opacity-40 cursor-not-allowed'
                                       : checked
-                                        ? 'border-amber-500/50 bg-amber-500/10 cursor-pointer'
-                                        : 'border-white/10 hover:border-white/20 cursor-pointer'
+                                        ? 'border-ink bg-side-a-tint cursor-pointer'
+                                        : 'border-transparent hover:border-ink cursor-pointer'
                                   }`}
                                 >
                                   <div
-                                    className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center ${checked ? 'bg-amber-500 border-amber-500' : 'border-white/30'}`}
+                                    className={`w-5 h-5 border-2 border-ink shrink-0 flex items-center justify-center ${checked ? 'bg-ink' : 'bg-paper'}`}
                                   >
                                     {checked && (
-                                      <span className="text-black text-[10px] font-bold">✓</span>
+                                      <Check className="w-3.5 h-3.5 text-paper" strokeWidth={3} />
                                     )}
                                   </div>
                                   <img
                                     src={img.realUrl}
                                     alt={img.name}
-                                    className="w-10 h-10 rounded object-cover shrink-0"
+                                    className="w-10 h-10 object-cover shrink-0"
                                     onError={(e) => {
                                       ;(e.target as HTMLImageElement).src =
                                         'https://placehold.co/40x40?text=?'
@@ -922,12 +922,12 @@ const AdminView: React.FC = () => {
                                   />
                                   <span className="text-sm truncate flex-1">{img.name}</span>
                                   {checked && (
-                                    <span className="text-amber-400 text-xs font-medium shrink-0">
+                                    <span className="type-label text-xs shrink-0">
                                       #{selectedImages.indexOf(img.name) + 1}
                                     </span>
                                   )}
                                   {usedElsewhere && !checked && usedOnDate && (
-                                    <span className="text-xs text-muted-foreground shrink-0 font-mono">
+                                    <span className="text-xs text-muted-foreground shrink-0">
                                       {usedOnDate}
                                     </span>
                                   )}
@@ -939,27 +939,27 @@ const AdminView: React.FC = () => {
                       </div>
 
                       {scheduleStatus === 'success' && (
-                        <div className="p-3 bg-green-500/10 border border-green-500/20 rounded text-green-400 text-xs text-center">
+                        <div className="p-3 border-4 border-ink text-ink font-medium text-xs text-center">
                           Challenge saved!
                         </div>
                       )}
                       {scheduleStatus === 'error' && (
-                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-xs text-center">
+                        <div className="p-3 bg-ink text-paper font-medium text-xs text-center">
                           Save failed. Try again.
                         </div>
                       )}
                     </CardContent>
                     <CardFooter>
                       <Button
-                        variant="neon"
-                        className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 border-amber-500/50"
+                        variant="default"
+                        className="w-full"
                         onClick={handleSaveChallenge}
                         disabled={saving || selectedImages.length === 0}
                       >
                         {saving ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
-                          <Calendar className="mr-2 h-4 w-4" />
+                          <Calendar className="h-5 w-5" />
                         )}
                         Save Challenge
                       </Button>
@@ -999,23 +999,23 @@ const AdminView: React.FC = () => {
                     }
 
                     return (
-                      <Card className="text-white">
+                      <Card>
                         <CardHeader className="pb-3">
                           <div className="flex items-center justify-between">
                             <CardTitle className="text-lg">Schedule</CardTitle>
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={prevMonth}
-                                className="p-1 rounded hover:bg-white/10 transition-colors"
+                                className="p-1.5 hover:bg-ink hover:text-paper transition-colors cursor-pointer"
                               >
                                 <ChevronLeft className="w-4 h-4" />
                               </button>
-                              <span className="text-sm font-medium w-36 text-center">
+                              <span className="type-label text-sm w-40 text-center">
                                 {monthLabel}
                               </span>
                               <button
                                 onClick={nextMonth}
-                                className="p-1 rounded hover:bg-white/10 transition-colors"
+                                className="p-1.5 hover:bg-ink hover:text-paper transition-colors cursor-pointer"
                               >
                                 <ChevronRight className="w-4 h-4" />
                               </button>
@@ -1062,18 +1062,18 @@ const AdminView: React.FC = () => {
                                       ? `${schedule[dateStr].images.length} images`
                                       : undefined
                                   }
-                                  className={`relative flex flex-col items-center justify-center rounded-lg py-1.5 text-sm transition-colors
-                                ${isSelected ? 'bg-amber-500/30 text-amber-300 font-bold' : ''}
-                                ${!isSelected && hasChallenge ? 'hover:bg-amber-500/10' : ''}
-                                ${!isSelected && !hasChallenge ? 'hover:bg-white/5' : ''}
-                                ${!hasChallenge && isPast && !isSelected ? 'text-muted-foreground/40' : ''}
-                                ${isToday && !isSelected ? 'ring-1 ring-white/30 rounded-lg' : ''}
+                                  className={`relative flex flex-col items-center justify-center py-1.5 text-sm font-semibold transition-colors cursor-pointer
+                                ${isSelected ? 'bg-ink text-paper font-bold' : ''}
+                                ${!isSelected && hasChallenge ? 'hover:bg-muted' : ''}
+                                ${!isSelected && !hasChallenge ? 'hover:bg-muted' : ''}
+                                ${!hasChallenge && isPast && !isSelected ? 'text-text-placeholder' : ''}
+                                ${isToday && !isSelected ? 'outline-2 outline-ink -outline-offset-2' : ''}
                               `}
                                 >
                                   <span>{day}</span>
                                   {hasChallenge && (
                                     <span
-                                      className={`w-1 h-1 rounded-full mt-0.5 ${isSelected ? 'bg-amber-300' : 'bg-amber-500'}`}
+                                      className="w-1.5 h-1.5 mt-0.5 bg-side-a"
                                     />
                                   )}
                                 </button>
@@ -1083,7 +1083,7 @@ const AdminView: React.FC = () => {
 
                           {/* Selected day actions */}
                           {schedule[selectedDate] && (
-                            <div className="mt-4 pt-3 border-t border-white/10 space-y-3">
+                            <div className="mt-4 pt-3 border-t-2 border-ink space-y-3">
                               <div className="flex items-center justify-between">
                                 <p className="text-xs text-muted-foreground">
                                   {new Date(selectedDate + 'T12:00:00').toLocaleDateString(
@@ -1091,17 +1091,16 @@ const AdminView: React.FC = () => {
                                     { weekday: 'short', month: 'short', day: 'numeric' },
                                   )}
                                   {' · '}
-                                  <span className="text-amber-400">
+                                  <span className="text-ink font-semibold">
                                     {schedule[selectedDate].images.length} images
                                   </span>
                                 </p>
                                 <Button
                                   variant="destructive"
                                   size="sm"
-                                  className="h-7 text-xs"
                                   onClick={() => handleDeleteChallenge(selectedDate)}
                                 >
-                                  <Trash2 className="w-3 h-3 mr-1" />
+                                  <Trash2 />
                                   Delete
                                 </Button>
                               </div>
@@ -1112,7 +1111,7 @@ const AdminView: React.FC = () => {
                                   return (
                                     <div key={filename} className="flex items-center gap-2">
                                       <div className="flex gap-1 shrink-0">
-                                        <div className="w-12 h-12 rounded overflow-hidden bg-black/30 border border-indigo-500/20">
+                                        <div className="w-12 h-12 overflow-hidden bg-muted border-2 border-ink">
                                           <img
                                             src={
                                               pair?.realUrl ??
@@ -1128,7 +1127,7 @@ const AdminView: React.FC = () => {
                                             }}
                                           />
                                         </div>
-                                        <div className="w-12 h-12 rounded overflow-hidden bg-black/30 border border-purple-500/20">
+                                        <div className="w-12 h-12 overflow-hidden bg-muted border-2 border-ink">
                                           <img
                                             src={
                                               pair?.aiUrl ??
@@ -1146,7 +1145,7 @@ const AdminView: React.FC = () => {
                                         </div>
                                       </div>
                                       <span
-                                        className="text-xs text-muted-foreground truncate flex-1 font-mono"
+                                        className="text-xs text-muted-foreground truncate flex-1"
                                         title={filename}
                                       >
                                         {filename}
@@ -1169,31 +1168,31 @@ const AdminView: React.FC = () => {
       </div>
 
       <Dialog open={!!selectedPair} onOpenChange={(open) => !open && setSelectedPair(null)}>
-        <DialogContent className="max-w-4xl bg-slate-900 border-slate-800">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold">{selectedPair?.name}</DialogTitle>
+            <DialogTitle className="type-display text-xl pr-12 break-all">{selectedPair?.name}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-6 mt-4">
             <div className="space-y-3">
-              <div className="text-center font-bold text-indigo-400 bg-indigo-500/10 py-2 rounded-lg">
+              <div className="text-center type-label bg-side-a text-ink py-2">
                 Real Image
               </div>
-              <div className="relative aspect-square rounded-xl overflow-hidden border-2 border-indigo-500/20">
+              <div className="relative aspect-square overflow-hidden border-4 border-ink">
                 <img
                   src={selectedPair?.realUrl}
-                  className="w-full h-full object-contain bg-black/40"
+                  className="w-full h-full object-contain bg-muted"
                   alt="Real"
                 />
               </div>
             </div>
             <div className="space-y-3">
-              <div className="text-center font-bold text-purple-400 bg-purple-500/10 py-2 rounded-lg">
+              <div className="text-center type-label bg-ink text-paper py-2">
                 AI Generated
               </div>
-              <div className="relative aspect-square rounded-xl overflow-hidden border-2 border-purple-500/20">
+              <div className="relative aspect-square overflow-hidden border-4 border-ink">
                 <img
                   src={selectedPair?.aiUrl}
-                  className="w-full h-full object-contain bg-black/40"
+                  className="w-full h-full object-contain bg-muted"
                   alt="AI"
                 />
               </div>

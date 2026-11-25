@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -9,11 +8,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import GameLayout from '@/components/GameLayout'
+import { ArrowRight, NameBlock, NO_EMOJI, ReplayIcon, Wordmark } from '@/components/Brand'
 import CountdownRing from '@/components/CountdownRing'
 import { supabase } from '@/lib/supabase'
 import { Users, UserX, X, Loader2 } from 'lucide-react'
-import confetti from 'canvas-confetti'
 import {
   RoomProvider,
   useOthers,
@@ -306,7 +304,6 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   // Confetti + history save when the game ends.
   useEffect(() => {
     if (gameStatus !== 'finished') return
-    confetti({ particleCount: 160, spread: 90, origin: { y: 0.5 } })
     if (players.length > 0) {
       const history = JSON.parse(localStorage.getItem('real_vs_ai_history') || '[]')
       if (!history.some((h: { gameId: string }) => h.gameId === code)) {
@@ -361,10 +358,6 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     })
     broadcast({ type: 'ROUND_REVEALED', correctChoice, scores: scoresMap })
 
-    const correctCount = results.filter((r) => r.correct).length
-    if (results.length > 0 && correctCount * 2 > results.length) {
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } })
-    }
   }
 
   revealResultRef.current = revealResult
@@ -403,98 +396,98 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   // Loading state
   if (!gameStatus || !currentRound) {
     return (
-      <div className="cosmic-bg min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-8 h-8 text-[#FF8552] animate-spin mx-auto" />
-          <p className="font-body text-sm text-[#9AA3D0]">Setting up the party…</p>
+      <main className="h-dvh grid grid-cols-2">
+        <div className="bg-side-a text-ink flex items-center justify-end px-14">
+          <span className="type-display text-[clamp(40px,5vw,76px)] leading-none">Setting up</span>
         </div>
-      </div>
+        <div className="bg-side-b text-paper flex items-center gap-6 px-14">
+          <span className="type-display text-[clamp(40px,5vw,76px)] leading-none">the party</span>
+          <Loader2 className="size-12 animate-spin" strokeWidth={3} aria-label="Loading" />
+        </div>
+      </main>
     )
   }
 
-  // Game over - podium
+  // Game over: final standings
   if (gameStatus === 'finished') {
     const winner = players[0]
-    const podiumRanks = [2, 1, 3]
-    const podiumHeights: Record<number, number> = { 1: 160, 2: 110, 3: 80 }
-    const podiumColor: Record<number, string> = {
-      1: 'bg-[#FFC94D] text-[#151936]',
-      2: 'bg-white/5 text-[#9AA3D0]',
-      3: 'bg-white/5 text-[#9AA3D0]',
-    }
-    const rest = players.slice(3)
+    const rest = players.slice(1, 9)
     const { totalVotes, wrongVotes } = gameStatsRef.current
     const fooledPct = totalVotes > 0 ? Math.round((wrongVotes / totalVotes) * 100) : null
+    const winnerName = (winner?.name ?? 'Nobody').toUpperCase()
+    // Fit names up to 12 characters across the orange field.
+    const winnerSize = `clamp(72px, ${Math.min(13, 62 / Math.max(winnerName.length, 4))}vw, 200px)`
 
     return (
-      <GameLayout className="max-w-4xl">
-        <div className="text-center mb-2">
-          <h1 className="font-display font-extrabold text-[52px] leading-tight text-[#FFF8F0]">
-            🏆 {winner ? `${winner.name} takes it!` : 'Game over!'}
-          </h1>
-          <p className="text-[#9AA3D0] mt-1">
-            {settings?.rounds ?? players.length} rounds · {players.length} players
-            {fooledPct !== null ? ` · ${fooledPct}% fooled by the AI` : ''}
-          </p>
-        </div>
-
-        {/* Podium */}
-        <div className="flex items-end justify-center gap-4 mt-10 mb-8">
-          {podiumRanks.map((rank) => {
-            const p = players[rank - 1]
-            if (!p) return <div key={rank} className="w-1/4" />
-            const isWinner = rank === 1
-            return (
-              <div key={rank} className="flex flex-col items-center gap-2 w-1/4 max-w-[180px]">
-                {isWinner && <span className="text-3xl leading-none">👑</span>}
-                <span className="text-4xl leading-none">{p.emoji}</span>
-                <span className="font-display font-bold text-[#FFF8F0]">{p.name}</span>
-                <motion.div
-                  initial={{ height: 0 }}
-                  animate={{ height: podiumHeights[rank] }}
-                  transition={{
-                    delay: 0.15 * (4 - rank),
-                    type: 'spring',
-                    stiffness: 120,
-                    damping: 16,
-                  }}
-                  className={`w-full rounded-t-[16px] flex flex-col items-center justify-center gap-1 ${podiumColor[rank]}`}
-                  style={{ minHeight: 60 }}
-                >
-                  <span className="font-display font-extrabold text-3xl leading-none">{rank}</span>
-                  <span
-                    className={`font-body font-semibold text-sm ${isWinner ? 'text-[#151936]/70' : 'text-[#6E77A8]'}`}
-                  >
-                    {p.score} pts
-                  </span>
-                </motion.div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Remaining players */}
-        {rest.length > 0 && (
-          <div className="space-y-2 max-w-xl mx-auto mb-8">
-            {rest.map((p, i) => (
-              <div
-                key={p.id}
-                className="flex items-center gap-3 rounded-[16px] bg-white/5 px-4 py-2.5"
-              >
-                <span className="font-display font-bold text-[#6E77A8] w-6">{i + 4}</span>
-                <span className="text-xl leading-none">{p.emoji}</span>
-                <span className="font-display font-bold text-[#FFF8F0]">{p.name}</span>
-                <span className="font-body font-semibold text-[#9AA3D0] ml-auto">
-                  {p.score} pts
-                </span>
-              </div>
-            ))}
+      <main className="min-h-dvh lg:h-dvh grid grid-cols-1 lg:grid-cols-[minmax(0,13fr)_minmax(0,7fr)] grid-rows-[auto_auto_auto] lg:grid-rows-[minmax(0,1fr)_112px] overflow-hidden">
+        <section className="bg-side-a text-ink px-6 md:px-14 pt-10 pb-11 flex flex-col justify-between gap-10 min-w-0">
+          <div className="flex justify-between type-label text-[clamp(14px,1.3vw,20px)]">
+            <span>Real or AI · Final</span>
+            <span>Winner</span>
           </div>
-        )}
+          <div className="flex flex-col gap-4 min-w-0">
+            <h1 className="type-display leading-[0.8] tracking-[-0.04em] break-words" style={{ fontSize: winnerSize }}>
+              {winnerName}
+            </h1>
+            <span className="type-display text-[clamp(44px,5.5vw,88px)] leading-[0.9]">
+              {winner ? 'Takes it.' : 'No winner.'}
+            </span>
+          </div>
+          {winner && (
+            <div className="flex items-baseline gap-5">
+              <span className="type-display text-[clamp(44px,4.5vw,72px)] leading-none tabular-nums">
+                {winner.score}
+              </span>
+              <span className="type-label text-[clamp(16px,1.4vw,22px)]">Points</span>
+            </div>
+          )}
+        </section>
 
-        <div className="flex gap-4 justify-center">
+        <section className="bg-side-b text-paper px-6 md:px-12 pt-10 pb-8 flex flex-col gap-3.5 min-h-0 on-dark">
+          <span className="type-label text-[clamp(14px,1.3vw,20px)]">Standings</span>
+          <ol className="flex flex-col overflow-y-auto">
+            {rest.map((p, i) => {
+              const big = i < 2
+              return (
+                <li
+                  key={p.id}
+                  className={`flex items-baseline gap-[18px] border-b-2 border-side-b-line ${big ? 'py-3.5' : 'py-2.5'}`}
+                >
+                  <span
+                    className={`type-display leading-none w-12 ${big ? 'text-[clamp(30px,2.8vw,44px)]' : 'text-[clamp(20px,1.6vw,26px)]'}`}
+                  >
+                    {i + 2}
+                  </span>
+                  <span
+                    className={`type-name leading-none truncate ${big ? 'text-[clamp(30px,2.8vw,44px)]' : 'text-[clamp(20px,1.6vw,26px)]'}`}
+                  >
+                    {p.name}
+                  </span>
+                  <span className="ml-auto type-label text-lg tabular-nums shrink-0">{p.score} pts</span>
+                </li>
+              )
+            })}
+            {rest.length === 0 && (
+              <li className="font-medium text-lg text-on-blue-muted py-3">Only one player this time.</li>
+            )}
+          </ol>
+        </section>
+
+        <footer className="lg:col-span-2 bg-ink text-paper flex flex-col sm:flex-row sm:items-center on-dark">
+          <span className="flex-1 type-label text-[clamp(16px,1.3vw,20px)] px-6 md:px-14 py-6 sm:py-0">
+            {settings?.rounds ?? roundsStorage?.length ?? 0} rounds · {players.length} {players.length === 1 ? 'player' : 'players'}
+            {fooledPct !== null && (
+              <>
+                {' · '}
+                <span className="text-side-a">{fooledPct}% fooled by the AI</span>
+              </>
+            )}
+          </span>
+          <Button variant="paper" className="h-[112px] px-10 text-[28px] rounded-none" onClick={() => navigate('/')}>
+            Back home
+          </Button>
           <Button
-            size="lg"
+            className="h-[112px] px-11 text-[28px]"
             onClick={() => {
               resetGame()
               navigate(`/lobby/${code}`, {
@@ -506,16 +499,12 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
               })
             }}
           >
-            Play again 🔁
+            Play again <ReplayIcon />
           </Button>
-          <Button variant="ghost" size="lg" onClick={() => navigate('/')}>
-            Back home
-          </Button>
-        </div>
+        </footer>
         {/* Results screen - banner allowed. Popunder is player-device only, not
             fired on this shared host display. */}
-
-      </GameLayout>
+      </main>
     )
   }
 
@@ -535,286 +524,255 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
 
   const liveVotesVisible = settings?.revealMode === 'instant'
   const bossName = bossPlayerId ? (playerLookup.get(bossPlayerId)?.name ?? null) : null
-
-  const VoterCluster: React.FC<{ side: 'A' | 'B' }> = ({ side }) => {
-    const voters = Object.entries(votes).filter(([, choice]) => choice === side)
-    if (voters.length === 0) return null
-    return (
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex -space-x-3 px-4 py-2 rounded-full bg-[#151936]/70 backdrop-blur-sm z-20">
-        {voters.map(([pid], index) => {
-          const player = playerLookup.get(pid)
-          if (!player) return null
-          return (
-            <motion.span
-              key={pid}
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20, delay: index * 0.04 }}
-              className="text-3xl drop-shadow-lg"
-              title={player.name}
-            >
-              {player.emoji}
-            </motion.span>
-          )
-        })}
-      </div>
-    )
-  }
+  const votersFor = (side: 'A' | 'B') =>
+    Object.entries(votes)
+      .filter(([, choice]) => choice === side)
+      .map(([pid]) => playerLookup.get(pid))
+      .filter((p): p is NonNullable<typeof p> => Boolean(p))
 
   const ManagePlayers = (
     <Dialog open={showPlayersModal} onOpenChange={setShowPlayersModal}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Manage players">
-          <Users className="w-5 h-5" />
+        <Button variant="outline" size="icon" aria-label="Manage players" className="text-paper">
+          <Users strokeWidth={2.5} />
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-sm rounded-[24px] bg-[#1F2450] border-white/[0.07] text-[#FFF8F0]">
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display font-extrabold text-[#FFF8F0]">Players</DialogTitle>
+          <DialogTitle>Players</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-col gap-2 mt-2">
+        <ul className="flex flex-col border-t-4 border-ink">
           {players.length === 0 && (
-            <p className="font-body text-sm text-[#9AA3D0] text-center py-4">No players yet</p>
+            <li className="font-medium text-text-muted py-4">No players yet.</li>
           )}
           {players.map((p) => (
-            <div
-              key={p.id}
-              className="flex items-center justify-between rounded-[14px] bg-white/5 px-3 py-2"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-xl">{p.emoji}</span>
-                <div>
-                  <p className="font-display font-bold text-sm text-[#FFF8F0]">{p.name}</p>
-                  <p className="font-body text-xs text-[#9AA3D0]">{p.score} pts</p>
-                </div>
+            <li key={p.id} className="flex items-center justify-between gap-3 border-b-2 border-ink py-2.5">
+              <div className="flex flex-col min-w-0">
+                <span className="type-name text-xl truncate">{p.name}</span>
+                <span className="type-label text-sm text-text-muted">{p.score} pts</span>
               </div>
               {confirmKickId === p.id ? (
-                <div className="flex items-center gap-1">
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="h-8 px-2 text-xs"
-                    onClick={() => handleKickPlayer(p.id)}
-                  >
-                    Kick
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button variant="ink" size="sm" onClick={() => handleKickPlayer(p.id)}>
+                    Remove
                   </Button>
                   <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 px-2"
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11"
+                    aria-label="Keep player"
                     onClick={() => setConfirmKickId(null)}
                   >
-                    <X className="w-3 h-3" />
+                    <X strokeWidth={3} />
                   </Button>
                 </div>
               ) : (
                 <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8 w-8 p-0 border-0 hover:text-[#FF6A6A]"
+                  variant="outline"
+                  size="icon"
+                  className="h-11 w-11 shrink-0"
+                  aria-label={`Remove ${p.name}`}
                   onClick={() => setConfirmKickId(p.id)}
                 >
-                  <UserX className="w-4 h-4" />
+                  <UserX strokeWidth={2.5} />
                 </Button>
               )}
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </DialogContent>
     </Dialog>
   )
 
-  // Reveal view (3-column) - replaces the old blur-overlay modal.
-  if (showResult) {
-    const winnerLetter = correctChoice
+  // Round and reveal share one tree, so the split can slide from 50/50 to 70/30.
+  const revealed = showResult
+  const aWins = correctChoice === 'A'
+  const growA = revealed ? (aWins ? 7 : 3) : 1
+  const growB = revealed ? (aWins ? 3 : 7) : 1
+  const fieldA = revealed && !aWins ? 'bg-side-a-tint' : 'bg-side-a'
+  const fieldB = revealed && aWins ? 'bg-side-b-deep' : 'bg-side-b'
+  const fieldPad = 'px-[clamp(20px,3.5vw,56px)] pt-[clamp(20px,2.5vw,40px)] pb-[clamp(16px,2vw,32px)]'
+  const verdictSize = 'text-[clamp(48px,6.5vw,104px)] leading-[0.9] tracking-[-0.03em]'
+  const loserSize = 'text-[clamp(32px,3.5vw,56px)] leading-[0.95]'
+  const headlineSize = 'text-[clamp(40px,4.75vw,76px)] leading-[0.95] tracking-[-0.02em]'
+  const letterSize = 'text-[clamp(90px,9.4vw,150px)] leading-[0.78]'
+
+  const voteMeta = (side: 'A' | 'B') => {
+    const n = Object.values(votes).filter((v) => v === side).length
+    if (revealed) {
+      const real = side === correctChoice
+      return real ? `${n} got it` : `${n} fooled`
+    }
+    return liveVotesVisible ? `${n} ${n === 1 ? 'vote' : 'votes'}` : ''
+  }
+
+  const VoterRow: React.FC<{ side: 'A' | 'B'; onBlue: boolean }> = ({ side, onBlue }) => {
+    if (!revealed && !liveVotesVisible) return null
+    const voters = votersFor(side)
+    if (voters.length === 0) return null
     return (
-      <GameLayout className="max-w-6xl">
-        <h1 className="text-center font-display font-extrabold text-[30px] md:text-[40px] text-[#FFF8F0] mb-4">
-          <span className="text-[#57E6D2]">{winnerLetter} was real!</span> {correctCount} of{' '}
-          {totalPlayers} got it 🎉
-        </h1>
-
-        {/* Images keep the exact same left/right positions as during the round,
-            so A stays where players saw it. Height is capped so the standings
-            row below stays visible on a TV without scrolling. */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
-          {(['A', 'B'] as const).map((letter, i) => {
-            const isReal = letter === correctChoice
-            const letterBadge =
-              letter === 'A'
-                ? 'bg-[#FF8552] text-[#151936] shadow-[0_4px_0_#C25327]'
-                : 'bg-[#57E6D2] text-[#151936] shadow-[0_4px_0_#2FA391]'
-            return (
-              <motion.div
-                key={letter}
-                initial={{ scale: 0.92, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: i * 0.05 }}
-                className={`relative rounded-[24px] aspect-[4/3] max-h-[46vh] ${
-                  isReal
-                    ? 'border-4 border-[#57E6D2] shadow-[0_0_40px_rgba(87,230,210,0.25)]'
-                    : 'border-4 border-white/10'
-                }`}
-              >
-                <div className="absolute inset-0 rounded-[20px] overflow-hidden">
-                  <img
-                    src={letter === 'A' ? leftImage : rightImage}
-                    className="w-full h-full object-cover"
-                    style={isReal ? undefined : { filter: 'saturate(.6) brightness(.8)' }}
-                  />
-                </div>
-                <div
-                  className={`absolute -top-3.5 -left-3.5 w-11 h-11 rounded-[14px] flex items-center justify-center font-display font-extrabold text-xl z-20 ${letterBadge}`}
-                >
-                  {letter}
-                </div>
-                <span
-                  className={`absolute top-3 right-3 rounded-full font-display font-extrabold text-sm px-3 py-1 z-20 ${
-                    isReal ? 'bg-[#57E6D2] text-[#151936]' : 'bg-[#FF6A6A] text-[#151936]'
-                  }`}
-                >
-                  {isReal ? '✓ REAL' : '🤖 AI'}
-                </span>
-                <VoterCluster side={letter} />
-              </motion.div>
-            )
-          })}
-        </div>
-
-        {/* Standings - full width row underneath the images */}
-        <div className="rounded-[24px] border border-white/[0.07] bg-[#1F2450] p-5 mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <h3 className="font-display font-bold text-[#FFF8F0] text-lg">Standings</h3>
-              {bossName && (
-                <span className="rounded-full bg-[#FFC94D]/15 px-3 py-1 font-body text-sm text-[#FFC94D]">
-                  👑 {bossName} can advance too
-                </span>
-              )}
-            </div>
-            <Button className="min-w-[190px]" onClick={nextRound}>
-              {currentRoundIndex + 1 >= totalRounds ? 'See results →' : 'Next round →'}
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {players.map((p, i) => {
-                const rank = i + 1
-                const prev = prevRanksRef.current[p.id] ?? rank
-                const delta = prev - rank
-                const isLeader = rank === 1
-                return (
-                  <motion.div
-                    layout
-                    key={p.id}
-                    className={`flex items-center gap-3 rounded-[14px] px-3 py-2 ${
-                      isLeader ? 'bg-[#FFC94D]/12' : 'bg-white/5'
-                    }`}
-                  >
-                    <span
-                      className={`font-display font-extrabold w-5 ${isLeader ? 'text-[#FFC94D]' : 'text-[#6E77A8]'}`}
-                    >
-                      {rank}
-                    </span>
-                    <span className="text-xl leading-none">{p.emoji}</span>
-                    <span className="font-display font-bold text-[#FFF8F0] truncate">{p.name}</span>
-                    {delta > 0 && (
-                      <span className="font-body text-xs font-bold text-[#57E6D2]">▲{delta}</span>
-                    )}
-                    {delta < 0 && (
-                      <span className="font-body text-xs font-bold text-[#FF6A6A]">▼{-delta}</span>
-                    )}
-                    <span
-                      className={`font-display font-extrabold ml-auto ${isLeader ? 'text-[#FFC94D]' : 'text-[#FFF8F0]'}`}
-                    >
-                      {p.score}
-                    </span>
-                  </motion.div>
-                )
-              })}
-          </div>
-        </div>
-        {/* Between-rounds reveal - safe to show a banner here. */}
-
-      </GameLayout>
+      <ul className={`flex flex-wrap gap-2 ${side === 'A' ? 'justify-end' : 'justify-start'}`}>
+        {voters.slice(0, 10).map((p) => (
+          <li key={p.id}>
+            <NameBlock name={p.name} tone={onBlue ? 'paper' : 'ink'} small />
+          </li>
+        ))}
+        {voters.length > 10 && (
+          <li className="type-label text-lg self-center">+{voters.length - 10}</li>
+        )}
+      </ul>
     )
   }
 
-  // Round view
   return (
-    <GameLayout className="max-w-6xl">
-      {/* Top bar */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <span className="font-display font-extrabold text-2xl text-[#FFF8F0]">
-            Round {currentRoundIndex + 1}{' '}
-            <span className="text-[#9AA3D0]">of {settings?.rounds ?? '?'}</span>
-          </span>
-          <span className="rounded-full bg-white/5 px-3 py-1.5 font-body text-sm text-[#9AA3D0]">
-            {votedCount} of {totalPlayers} voted
-          </span>
-        </div>
-
-        <CountdownRing value={timeLeft} total={settings?.timeLimit ?? 15} size={76} />
-
-        <div className="flex items-center gap-2">
-          {ManagePlayers}
-          {settings?.revealMode === 'after_round' && (
-            <Button variant="secondary" size="sm" onClick={() => revealResult()}>
-              Reveal
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={handleSkipPicture} disabled={isReplacing}>
-            {isReplacing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Swap this pair ↻'}
-          </Button>
-        </div>
-      </div>
-
-      <h2 className="text-center font-display font-extrabold text-[34px] text-[#FFF8F0] mb-8">
-        Which one's real?
-      </h2>
-
-      {/* Images */}
-      <div className="grid grid-cols-2 gap-8">
-        {(['A', 'B'] as const).map((letter) => {
-          const img = letter === 'A' ? leftImage : rightImage
-          const badge =
-            letter === 'A'
-              ? 'bg-[#FF8552] text-[#151936] shadow-[0_4px_0_#C25327]'
-              : 'bg-[#57E6D2] text-[#151936] shadow-[0_4px_0_#2FA391]'
-          return (
-            <div key={letter} className="relative aspect-[4/3]">
-              <div
-                className={`absolute -top-3.5 -left-3.5 w-11 h-11 rounded-[14px] flex items-center justify-center font-display font-extrabold text-xl z-20 ${badge}`}
-              >
-                {letter}
-              </div>
-              <img
-                src={img}
-                className="w-full h-full object-cover rounded-[24px] border-[3px] border-white/10"
-              />
-              {liveVotesVisible && <VoterCluster side={letter} />}
+    <main className="h-dvh flex flex-col overflow-hidden">
+      <div className="flex-1 flex min-h-0 relative">
+        {/* A */}
+        <section
+          className={`split-field ${fieldA} text-ink ${fieldPad} flex flex-col items-end gap-[clamp(12px,1.6vw,24px)] overflow-hidden`}
+          style={{ flexGrow: growA, flexBasis: 0 }}
+        >
+          <div className="w-full flex justify-between type-label text-[clamp(14px,1.3vw,20px)]">
+            <Wordmark className="text-[clamp(14px,1.3vw,20px)] tracking-[0.02em]" />
+            <span>
+              Round {currentRoundIndex + 1}/{totalRounds}
+              {revealed ? ' · The verdict' : ''}
+            </span>
+          </div>
+          <h1 className={`type-display text-right ${revealed ? (aWins ? verdictSize : loserSize) : headlineSize}`}>
+            {revealed ? (aWins ? 'A was real.' : 'AI-made.') : (
+              <>
+                Which one's
+                <span className="sr-only"> real?</span>
+              </>
+            )}
+          </h1>
+          <div className="flex-1 min-h-0 w-full flex justify-end">
+            <img
+              src={leftImage}
+              alt="Photo A"
+              className={`max-h-full max-w-full object-contain transition-opacity duration-500 ${revealed && !aWins ? 'opacity-60' : ''}`}
+            />
+          </div>
+          <div className="w-full flex items-end justify-between gap-4">
+            <div className="flex flex-col gap-2 min-w-0">
+              <span className="type-label text-[clamp(14px,1.3vw,20px)]">{voteMeta('A')}</span>
+              <VoterRow side="A" onBlue={false} />
             </div>
-          )
-        })}
+            <span className={`type-display ${letterSize}`} aria-hidden="true">
+              A
+            </span>
+          </div>
+        </section>
+
+        {/* B */}
+        <section
+          className={`split-field ${fieldB} text-paper on-dark ${fieldPad} flex flex-col items-start gap-[clamp(12px,1.6vw,24px)] overflow-hidden`}
+          style={{ flexGrow: growB, flexBasis: 0 }}
+        >
+          <div className="w-full flex justify-between type-label text-[clamp(14px,1.3vw,20px)]">
+            <span>
+              {revealed ? `${correctCount} of ${totalPlayers} got it` : `${votedCount} of ${totalPlayers} voted`}
+            </span>
+            <span>{liveVotesVisible ? 'Live votes' : 'Votes after the round'}</span>
+          </div>
+          <span
+            aria-hidden={!revealed}
+            className={`type-display ${revealed ? (aWins ? loserSize : verdictSize) : headlineSize}`}
+          >
+            {revealed ? (aWins ? 'AI-made.' : 'B was real.') : 'Real?'}
+          </span>
+          <div className="flex-1 min-h-0 w-full flex justify-start">
+            <img
+              src={rightImage}
+              alt="Photo B"
+              className={`max-h-full max-w-full object-contain transition-opacity duration-500 ${revealed && aWins ? 'opacity-60' : ''}`}
+            />
+          </div>
+          <div className="w-full flex items-end justify-between gap-4">
+            <span className={`type-display ${letterSize}`} aria-hidden="true">
+              B
+            </span>
+            <div className="flex flex-col items-end gap-2 min-w-0">
+              <span className="type-label text-[clamp(14px,1.3vw,20px)]">{voteMeta('B')}</span>
+              <VoterRow side="B" onBlue />
+            </div>
+          </div>
+        </section>
+
+        {!revealed && (
+          <CountdownRing
+            value={timeLeft}
+            total={settings?.timeLimit ?? 15}
+            size={156}
+            caption="SEC"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none max-lg:scale-75"
+          />
+        )}
       </div>
 
-      {/* Progress dots */}
-      <div className="flex items-center justify-center gap-1.5 mt-8">
-        {Array.from({ length: totalRounds }).map((_, idx) => (
-          <div
-            key={idx}
-            className={`h-2 rounded-full transition-colors ${
-              idx < currentRoundIndex
-                ? 'bg-[#57E6D2] w-[22px]'
-                : idx === currentRoundIndex
-                  ? 'bg-[#FF8552] w-[28px]'
-                  : 'bg-white/12 w-[22px]'
-            }`}
-          />
-        ))}
-      </div>
+      {/* Ink band: host controls during the round, standings on the reveal */}
+      <footer className="h-[112px] shrink-0 bg-ink text-paper flex items-center on-dark">
+        {revealed ? (
+          <>
+            <ol className="flex-1 grid grid-cols-3 lg:grid-cols-5 gap-4 px-[clamp(20px,3.5vw,56px)] min-w-0">
+              {players.slice(0, 5).map((p, i) => (
+                <li key={p.id} className={`flex items-baseline gap-3.5 min-w-0 ${i > 2 ? 'max-lg:hidden' : ''}`}>
+                  <span className={`type-display text-[34px] leading-none ${i === 0 ? 'text-side-a' : ''}`}>{i + 1}</span>
+                  <span className="flex flex-col gap-0.5 min-w-0">
+                    <span className="type-name text-2xl leading-none truncate">{p.name}</span>
+                    <span className="font-semibold text-base text-on-ink-muted tabular-nums">{p.score} pts</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+            {bossName && (
+              <span className="hidden xl:block type-label text-sm text-on-ink-muted px-4 max-w-[220px]">
+                {bossName} can move on too
+              </span>
+            )}
+            <Button className="h-[112px] px-11 text-[clamp(22px,2vw,30px)]" onClick={nextRound}>
+              {currentRoundIndex + 1 >= totalRounds ? 'See results' : 'Next round'} <ArrowRight />
+            </Button>
+          </>
+        ) : (
+          <>
+            <div className="flex-1 flex items-center gap-6 px-[clamp(20px,3.5vw,56px)] min-w-0">
+              <div className="flex gap-1.5" aria-label={`Round ${currentRoundIndex + 1} of ${totalRounds}`}>
+                {Array.from({ length: totalRounds }).map((_, idx) => (
+                  <span
+                    key={idx}
+                    className={`h-3 w-3 ${
+                      idx < currentRoundIndex
+                        ? 'bg-paper'
+                        : idx === currentRoundIndex
+                          ? 'bg-side-a'
+                          : 'border-2 border-on-ink-muted'
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="type-label text-[clamp(14px,1.3vw,20px)] truncate">
+                {bossName ? `${bossName} is the boss` : 'Space reveals early'}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 pr-[clamp(20px,3.5vw,56px)]">
+              {ManagePlayers}
+              <Button variant="outline" className="text-paper h-12 text-base px-4" onClick={handleSkipPicture} disabled={isReplacing}>
+                {isReplacing ? <Loader2 className="animate-spin" /> : <ReplayIcon />}
+                Swap pair
+              </Button>
+              {settings?.revealMode === 'after_round' && (
+                <Button className="h-12 text-base px-5" onClick={() => revealResult()}>
+                  Reveal
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+      </footer>
       {/* No banner on the active round view - never advertise during answering. */}
-    </GameLayout>
+    </main>
   )
 }
 
@@ -828,7 +786,7 @@ const GameHost: React.FC = () => {
       id={code}
       initialPresence={{
         name: 'Host',
-        emoji: '👑',
+        emoji: NO_EMOJI,
         playerId: 'host',
         isHost: true,
         hasVoted: false,

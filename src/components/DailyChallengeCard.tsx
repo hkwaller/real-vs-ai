@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { ArrowRight } from '@/components/Brand'
 import { fetchSchedule, getDailyScores, getTodayDate, type RoundDetail } from '@/lib/dailyChallenge'
 
 type CardStatus = 'loading' | 'available' | 'completed' | 'no_challenge'
@@ -56,57 +57,68 @@ const DailyChallengeCard: React.FC = () => {
     return 'empty'
   })
 
+  const dateLabel = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase()
+
   return (
-    <div className="rounded-[24px] border border-white/[0.07] bg-[#1F2450] p-6">
-      <p className="font-body font-bold text-xs tracking-[0.15em] uppercase text-[#57E6D2] mb-2">
-        Daily challenge
-      </p>
-      <h2 className="font-display font-bold text-[#FFF8F0] text-2xl">Today's five</h2>
-      <p className="text-[#9AA3D0] text-sm mt-2">
+    <article className="bg-side-b text-paper on-dark px-4 md:px-14 py-12 md:py-[72px] flex flex-col gap-[22px]">
+      <span className="type-label text-base">Daily challenge · {dateLabel}</span>
+      <h2 className="type-display text-[clamp(48px,5vw,80px)] leading-[0.88]">Today's five.</h2>
+      <p className="font-medium text-[19px] leading-[1.45] text-on-blue-muted max-w-[34ch]">
         {status === 'loading' && 'Loading today’s challenge…'}
-        {status === 'available' && 'Five new rounds every day - finish before midnight.'}
-        {status === 'completed' && "Nice - you've finished today's five."}
+        {status === 'available' && 'Five pairs a day, the same for everyone. Finish before midnight.'}
+        {status === 'completed' && "You've finished today's five. Come back tomorrow for the next."}
         {status === 'no_challenge' && 'No challenge today. Check back tomorrow.'}
       </p>
 
-      {/* Progress squares */}
-      <div className="flex items-center gap-2 mt-5">
-        {squares.map((s, i) => (
-          <div
+      <div
+        className="flex gap-2"
+        role="img"
+        aria-label={
+          status === 'completed'
+            ? `${squares.filter((x) => x === 'correct').length} of 5 right`
+            : 'Not played yet'
+        }
+      >
+        {squares.map((sq, i) => (
+          <span
             key={i}
-            className={`w-3 h-3 rounded-[4px] ${
-              s === 'correct' ? 'bg-[#57E6D2]' : s === 'wrong' ? 'bg-[#FF6A6A]' : 'bg-white/10'
+            className={`w-12 h-12 ${
+              sq === 'correct'
+                ? 'bg-paper'
+                : sq === 'wrong'
+                  ? 'border-4 border-paper'
+                  : 'border-4 border-dashed border-slot-line-blue'
             }`}
           />
         ))}
       </div>
 
-      <div className="flex items-center justify-between mt-6">
+      <div className="flex flex-wrap items-center gap-6 mt-2.5">
         {status === 'completed' || status === 'no_challenge' ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="rounded-full"
-            onClick={() => navigate('/daily/archive')}
-          >
-            Past challenges
+          <Button variant="outline" onClick={() => navigate('/daily/archive')}>
+            Past days
           </Button>
         ) : (
-          <Button
-            variant="secondary"
-            onClick={() => navigate('/daily')}
-            disabled={status === 'loading'}
-          >
-            Keep playing
-          </Button>
+          <>
+            <Button
+              className="h-[72px] px-7 text-2xl"
+              onClick={() => navigate('/daily')}
+              disabled={status === 'loading'}
+            >
+              Play today's five <ArrowRight />
+            </Button>
+            <button
+              type="button"
+              onClick={() => navigate('/daily/archive')}
+              className="type-label text-base py-3 underline underline-offset-4"
+            >
+              Past days
+            </button>
+          </>
         )}
-        {streak > 0 && (
-          <span className="font-body font-semibold text-sm text-[#FFC94D]">
-            🔥 {streak}-day streak
-          </span>
-        )}
+        {streak > 0 && <span className="type-label text-base">{streak}-day streak</span>}
       </div>
-    </div>
+    </article>
   )
 }
 

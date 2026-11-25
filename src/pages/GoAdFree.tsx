@@ -116,7 +116,7 @@ const GoAdFree: React.FC = () => {
     return (
       <GameLayout>
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-[#FF8552]" />
+          <Loader2 className="w-8 h-8 animate-spin text-ink" strokeWidth={3} />
         </div>
       </GameLayout>
     )
@@ -134,16 +134,16 @@ const GoAdFree: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-3"
+          className="text-center space-y-4"
         >
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#FF8552]/15 px-4 py-1.5">
-            <Sparkles className="w-4 h-4 text-[#FF8552]" />
-            <span className="font-body font-semibold text-sm text-[#FF8552]">Go ad-free</span>
+          <div className="inline-flex items-center gap-2 bg-side-a text-ink px-3 py-1.5">
+            <Sparkles className="w-4 h-4" strokeWidth={2.5} />
+            <span className="type-label text-sm">Go ad-free</span>
           </div>
-          <h1 className="font-display font-extrabold text-[44px] leading-tight text-[#FFF8F0]">
-            Play without the ads
+          <h1 className="type-display text-[40px] md:text-[56px] leading-[0.95]">
+            Play without the ads.
           </h1>
-          <p className="text-[#9AA3D0] max-w-md mx-auto">
+          <p className="font-medium text-text-muted max-w-md mx-auto">
             Pick a pass. Ads disappear instantly - and when you host, your whole room rides along.
           </p>
         </motion.div>
@@ -153,17 +153,17 @@ const GoAdFree: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="rounded-[20px] border border-[#57E6D2]/40 bg-[#57E6D2]/10 p-5 flex items-center justify-between flex-wrap gap-4"
+            className="bg-side-a text-ink p-5 flex items-center justify-between flex-wrap gap-4"
           >
             <div className="flex items-center gap-3">
-              <ShieldCheck className="w-6 h-6 text-[#57E6D2]" />
+              <ShieldCheck className="w-7 h-7 shrink-0" strokeWidth={2.5} />
               <div>
-                <p className="font-display font-bold text-[#FFF8F0]">
+                <p className="type-display text-lg leading-tight">
                   You're ad-free
                   {metadata?.adFreePlan ? ` · ${metadata.adFreePlan} plan` : ''}
                 </p>
                 {until && (
-                  <p className="font-body text-sm text-[#9AA3D0]">
+                  <p className="font-medium text-sm">
                     {subscriptionActive ? 'Renews' : 'Until'}{' '}
                     {until.toLocaleString(undefined, {
                       dateStyle: 'medium',
@@ -173,7 +173,7 @@ const GoAdFree: React.FC = () => {
                 )}
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {subscriptionActive && (
                 <Button
                   variant="ghost"
@@ -188,7 +188,7 @@ const GoAdFree: React.FC = () => {
                   )}
                 </Button>
               )}
-              <Button variant="secondary" size="sm" onClick={() => navigate('/')}>
+              <Button variant="ink" size="sm" onClick={() => navigate('/')}>
                 Back to game
               </Button>
             </div>
@@ -197,43 +197,41 @@ const GoAdFree: React.FC = () => {
 
         {/* Polling notice */}
         {polling && !adFree && (
-          <div className="rounded-[16px] bg-white/5 p-4 flex items-center justify-center gap-3 text-[#9AA3D0]">
-            <Loader2 className="w-4 h-4 animate-spin text-[#FF8552]" />
-            <span className="font-body text-sm">Confirming your purchase…</span>
+          <div className="border-4 border-ink p-4 flex items-center justify-center gap-3 text-ink">
+            <Loader2 className="w-4 h-4 animate-spin" strokeWidth={3} />
+            <span className="font-semibold text-sm">Confirming your purchase…</span>
           </div>
         )}
 
         {/* Tiers - hidden once ad-free unless a subscription might be upgraded */}
         {!adFree && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-3">
               {TIERS.map((tier) => (
                 <div
                   key={tier.id}
                   className={cn(
-                    'relative rounded-[24px] border bg-[#1F2450] p-6 flex flex-col gap-5',
-                    tier.badge ? 'border-[#FF8552]/60' : 'border-white/[0.07]',
+                    'relative border-4 bg-paper p-6 flex flex-col gap-5',
+                    tier.badge ? 'border-side-a' : 'border-ink',
                   )}
                 >
                   {tier.badge && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#FF8552] text-[#151936] font-display font-extrabold text-xs px-3 py-1 whitespace-nowrap">
+                    <div className="absolute -top-4 left-5 bg-side-a text-ink type-label text-xs px-3 py-1.5 whitespace-nowrap">
                       {tier.badge}
                     </div>
                   )}
                   <div>
-                    <p className="font-body font-semibold text-sm text-[#9AA3D0]">{tier.name}</p>
-                    <div className="flex items-baseline gap-1.5 mt-1">
-                      <span className="font-display font-extrabold text-4xl text-[#FFF8F0]">
-                        {tier.price}
-                      </span>
-                      <span className="font-body text-sm text-[#6E77A8]">{tier.period}</span>
+                    <p className="type-label text-sm text-text-muted">{tier.name}</p>
+                    <div className="flex items-baseline gap-1.5 mt-2">
+                      <span className="type-display text-4xl leading-none">{tier.price}</span>
+                      <span className="type-label text-sm text-text-muted">{tier.period}</span>
                     </div>
-                    <p className="font-body text-sm text-[#9AA3D0] mt-1.5">{tier.blurb}</p>
+                    <p className="font-medium text-sm text-text-muted mt-2">{tier.blurb}</p>
                   </div>
 
                   {user ? (
                     <Button
-                      className="w-full mt-auto"
+                      className="w-full mt-auto md:h-11 md:px-3 md:text-sm lg:h-14 lg:text-lg"
                       variant={tier.badge ? 'default' : 'secondary'}
                       onClick={() => startCheckout(tier.id)}
                       disabled={loadingPlan !== null}
@@ -247,7 +245,7 @@ const GoAdFree: React.FC = () => {
                   ) : (
                     <SignInButton mode="modal">
                       <Button
-                        className="w-full mt-auto"
+                        className="w-full mt-auto md:h-11 md:px-3 md:text-sm lg:h-14 lg:text-lg"
                         variant={tier.badge ? 'default' : 'secondary'}
                       >
                         Sign in to buy
@@ -259,19 +257,19 @@ const GoAdFree: React.FC = () => {
             </div>
 
             {/* Perks */}
-            <div className="rounded-[24px] border border-white/[0.07] bg-[#1F2450] p-6">
+            <div className="border-4 border-ink p-6">
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {PERKS.map((perk) => (
                   <li key={perk} className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-[#57E6D2] shrink-0 mt-0.5" />
-                    <span className="font-body text-sm text-[#C6CCF2]">{perk}</span>
+                    <Check className="w-5 h-5 text-ink shrink-0" strokeWidth={3} />
+                    <span className="font-medium text-sm">{perk}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
             {!user && (
-              <p className="text-center font-body text-sm text-[#6E77A8]">
+              <p className="text-center font-medium text-sm text-text-muted">
                 Sign in required to purchase - it's how we tie the pass to your account.
               </p>
             )}

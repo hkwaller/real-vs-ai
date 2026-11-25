@@ -4,33 +4,32 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap font-display font-extrabold rounded-[16px] transition-all duration-100 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer',
+  // Split duel: flat, square, uppercase Archivo 900 at 125% width. Press darkens; nothing lifts.
+  'inline-flex items-center justify-center gap-3 whitespace-nowrap type-display tracking-normal rounded-none transition-[filter,background-color,color] duration-150 ease-out hover:brightness-[0.92] active:brightness-[0.84] disabled:pointer-events-none disabled:opacity-40 select-none cursor-pointer [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        // Coral - the signature physical button
-        default:
-          'bg-[#FF8552] text-[#151936] shadow-[0_6px_0_#C25327] hover:translate-y-[2px] hover:shadow-[0_4px_0_#C25327] active:translate-y-[2px] active:shadow-[0_4px_0_#C25327]',
-        // Aqua
-        secondary:
-          'bg-[#57E6D2] text-[#151936] shadow-[0_6px_0_#2FA391] hover:translate-y-[2px] hover:shadow-[0_4px_0_#2FA391] active:translate-y-[2px] active:shadow-[0_4px_0_#2FA391]',
-        // Danger
-        destructive:
-          'bg-[#FF6A6A] text-[#151936] shadow-[0_6px_0_#B84A4A] hover:translate-y-[2px] hover:shadow-[0_4px_0_#B84A4A] active:translate-y-[2px] active:shadow-[0_4px_0_#B84A4A]',
-        // Ghost pill - hover turns aqua
-        ghost:
-          'bg-transparent border-[1.5px] border-white/15 text-[#C6CCF2] hover:border-[#57E6D2] hover:text-[#57E6D2]',
-        outline:
-          'bg-transparent border-[1.5px] border-white/15 text-[#C6CCF2] hover:border-[#57E6D2] hover:text-[#57E6D2]',
-        link: 'text-[#FF8552] underline-offset-4 hover:underline bg-transparent',
-        neon: 'bg-[#FF8552] text-[#151936] shadow-[0_6px_0_#C25327] hover:translate-y-[2px] hover:shadow-[0_4px_0_#C25327] active:translate-y-[2px] active:shadow-[0_4px_0_#C25327]',
+        // Primary action: orange with ink text
+        default: 'bg-side-a text-ink',
+        // Committing a setup: blue with white text
+        secondary: 'bg-side-b text-paper',
+        // Destructive and single actions on paper: ink with white text
+        destructive: 'bg-ink text-paper',
+        ink: 'bg-ink text-paper',
+        paper: 'bg-paper text-ink',
+        // Secondary on any ground: 4px outline in the current text colour
+        ghost: 'bg-transparent text-current border-4 border-current hover:brightness-100 hover:bg-current/10',
+        outline: 'bg-transparent text-current border-4 border-current hover:brightness-100 hover:bg-current/10',
+        link: 'bg-transparent text-side-b underline underline-offset-4 normal-case font-bold hover:brightness-100',
+        neon: 'bg-side-a text-ink',
       },
       size: {
-        default: 'h-12 px-6 text-base',
-        sm: 'h-9 px-4 text-sm rounded-[14px]',
-        lg: 'h-14 px-8 text-lg',
-        icon: 'h-11 w-11 rounded-[14px]',
-        xl: 'h-16 px-10 text-xl',
+        default: 'h-14 px-6 text-lg',
+        sm: 'h-11 px-4 text-sm [&_svg]:size-4',
+        lg: 'h-[72px] px-8 text-2xl [&_svg]:size-6',
+        icon: 'h-12 w-12 [&_svg]:size-5',
+        xl: 'h-[88px] px-10 text-3xl [&_svg]:size-7',
+        bar: 'h-[112px] w-full justify-between px-6 text-[30px] [&_svg]:size-8',
       },
     },
     defaultVariants: {

@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import GameLayout from '@/components/GameLayout'
 import Seo from '@/components/Seo'
-import { Loader2, ZoomIn, X } from 'lucide-react'
+import { Check, Loader2, ZoomIn, X } from 'lucide-react'
+import { ArrowRight } from '@/components/Brand'
 import {
   getTodayDate,
   fetchSchedule,
@@ -175,11 +176,9 @@ const DailyChallenge: React.FC = () => {
     return (
       <GameLayout>
         {seo}
-        <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-10 max-w-sm mx-auto text-center space-y-4">
-          <Loader2 className="w-10 h-10 text-[#57E6D2] mx-auto animate-spin" />
-          <h1 className="font-display font-extrabold text-2xl text-[#FFF8F0]">
-            Loading today's five…
-          </h1>
+        <div className="border-4 border-ink p-10 max-w-sm mx-auto text-center space-y-5">
+          <Loader2 className="w-10 h-10 text-ink mx-auto animate-spin" strokeWidth={3} />
+          <h1 className="type-display text-2xl leading-none">Loading today's five…</h1>
         </div>
       </GameLayout>
     )
@@ -193,24 +192,21 @@ const DailyChallenge: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-10 max-w-md mx-auto text-center space-y-5"
+          className="border-4 border-ink p-8 max-w-md mx-auto text-center space-y-6"
         >
-          <div className="text-5xl">🗓️</div>
           <div>
-            <h1 className="font-display font-extrabold text-3xl text-[#FFF8F0]">
-              No challenge today
-            </h1>
-            <p className="text-[#9AA3D0] mt-2 text-sm">
+            <h1 className="type-display text-4xl leading-[0.95]">No challenge today.</h1>
+            <p className="font-medium text-text-muted mt-3">
               {isToday
                 ? 'Check back tomorrow for a fresh five.'
                 : `Nothing was scheduled for ${date}.`}
             </p>
           </div>
-          <div className="flex gap-3 justify-center">
-            <Button variant="ghost" onClick={() => navigate('/')}>
+          <div className="flex flex-wrap gap-3 justify-center">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
               Home
             </Button>
-            <Button variant="secondary" onClick={() => navigate('/daily/archive')}>
+            <Button variant="secondary" size="sm" onClick={() => navigate('/daily/archive')}>
               Past challenges
             </Button>
           </div>
@@ -230,64 +226,67 @@ const DailyChallenge: React.FC = () => {
       <GameLayout>
         {seo}
         <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="max-w-md mx-auto text-center flex flex-col items-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="max-w-md mx-auto flex flex-col"
         >
-          <div className="text-5xl mb-4">🎯</div>
-          <h1 className="font-display font-extrabold text-4xl text-[#FFF8F0]">
-            {correctCount} out of {totalRounds}!
-          </h1>
-          <p className="text-[#9AA3D0] mt-2">
+          {/* Score field */}
+          <div className="bg-side-a text-ink p-6 md:p-8">
+            <p className="type-label text-sm">Daily challenge · {prettyDate(date)}</p>
+            <h1 className="type-display text-[52px] md:text-[64px] leading-[0.9] mt-3">
+              {correctCount} out of {totalRounds}.
+            </h1>
+          </div>
+          <p className="font-semibold text-lg mt-5">
             {correctCount === totalRounds
               ? 'A perfect five. Incredible eye.'
               : correctCount >= totalRounds / 2
                 ? 'Nice eye - the AI didn’t fool you much today.'
-                : 'The AI got you today. Come back tomorrow!'}
+                : 'The AI got you today. Come back tomorrow.'}
           </p>
 
           {/* Result tiles */}
-          <div className="flex items-center justify-center gap-2.5 mt-6">
+          <div className="flex items-center gap-2 mt-5">
             {details.map((rd, i) => (
               <div
                 key={i}
-                className={`w-11 h-11 rounded-[12px] flex items-center justify-center font-display font-extrabold text-lg ${
-                  rd.correct
-                    ? 'bg-[#57E6D2]/15 text-[#57E6D2] border border-[#57E6D2]/40'
-                    : 'bg-[#FF6A6A]/15 text-[#FF6A6A] border border-[#FF6A6A]/40'
+                aria-label={rd.correct ? `Round ${i + 1}: right` : `Round ${i + 1}: fooled`}
+                className={`w-12 h-12 flex items-center justify-center ${
+                  rd.correct ? 'bg-side-a text-ink' : 'bg-ink text-paper'
                 }`}
               >
-                {rd.correct ? '✓' : '✗'}
+                {rd.correct ? (
+                  <Check className="w-6 h-6" strokeWidth={3} />
+                ) : (
+                  <X className="w-6 h-6" strokeWidth={3} />
+                )}
               </div>
             ))}
           </div>
 
           {streak > 0 && (
-            <div className="mt-6 rounded-full bg-[#FFC94D]/12 px-4 py-2">
-              <span className="font-body font-semibold text-sm text-[#FFC94D]">
-                🔥 {streak}-day streak
-              </span>
-            </div>
+            <p className="type-label text-sm self-start border-4 border-ink px-3 py-2 mt-5">
+              {streak}-day streak
+            </p>
           )}
 
           <div className="w-full mt-8 space-y-3">
-            <Button size="lg" className="w-full" onClick={handleShare}>
-              Challenge a friend 📤
+            <Button size="lg" className="w-full px-4 text-lg sm:text-2xl" onClick={handleShare}>
+              Challenge a friend
             </Button>
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="ghost" onClick={() => setShowReview((v) => !v)}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Button variant="ghost" size="sm" onClick={() => setShowReview((v) => !v)}>
                 Review rounds
               </Button>
-              <Button variant="ghost" onClick={() => navigate('/')}>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
                 Home
               </Button>
             </div>
           </div>
 
           {isToday && (
-            <p className="font-body text-sm text-[#6E77A8] mt-6">
-              Next five in{' '}
-              <span className="font-display font-bold text-[#57E6D2]">{countdown}</span>
+            <p className="type-label text-sm text-text-muted mt-6">
+              Next five in <span className="text-ink tabular-nums">{countdown}</span>
             </p>
           )}
 
@@ -298,34 +297,32 @@ const DailyChallenge: React.FC = () => {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="w-full mt-6 space-y-3 overflow-hidden text-left"
+                className="w-full mt-6 space-y-4 overflow-hidden text-left"
               >
                 {details.map((rd, i) => {
                   const imgA = rd.isRealLeft ? rd.realImageUrl : rd.aiImageUrl
                   const imgB = rd.isRealLeft ? rd.aiImageUrl : rd.realImageUrl
                   return (
-                    <div
-                      key={rd.roundId}
-                      className="rounded-[16px] border border-white/[0.07] bg-[#1F2450] p-3"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-body text-sm text-[#9AA3D0]">Round {i + 1}</span>
+                    <div key={rd.roundId} className="border-4 border-ink p-3">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="type-label text-sm">Round {i + 1}</span>
                         <span
-                          className={`font-body text-sm font-bold ${rd.correct ? 'text-[#57E6D2]' : 'text-[#FF6A6A]'}`}
+                          className={`type-label text-xs px-2 py-1 ${
+                            rd.correct ? 'bg-side-a text-ink' : 'bg-ink text-paper'
+                          }`}
                         >
-                          {rd.correct ? '✓ Correct' : '✗ Wrong'}
+                          {rd.correct ? 'Right' : 'Fooled'}
                         </span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         {(['A', 'B'] as const).map((opt) => {
                           const url = opt === 'A' ? imgA : imgB
                           const isReal = opt === rd.correctChoice
+                          const realTag = opt === 'A' ? 'bg-side-a text-ink' : 'bg-side-b text-paper'
                           return (
                             <div
                               key={opt}
-                              className={`relative overflow-hidden rounded-[12px] border-2 aspect-[4/3] ${
-                                isReal ? 'border-[#57E6D2]' : 'border-white/10'
-                              }`}
+                              className="relative overflow-hidden border-4 border-ink aspect-[4/3]"
                             >
                               <img
                                 src={url}
@@ -333,13 +330,11 @@ const DailyChallenge: React.FC = () => {
                                 className="w-full h-full object-cover"
                               />
                               <span
-                                className={`absolute bottom-1.5 left-1.5 rounded-full px-2 py-0.5 font-display font-bold text-xs ${
-                                  isReal
-                                    ? 'bg-[#57E6D2] text-[#151936]'
-                                    : 'bg-[#151936]/80 text-[#9AA3D0]'
+                                className={`absolute bottom-0 left-0 px-2 py-1 type-label text-xs ${
+                                  isReal ? realTag : 'bg-ink text-paper'
                                 }`}
                               >
-                                {isReal ? 'REAL' : 'AI'}
+                                {isReal ? 'Real' : 'AI'}
                               </span>
                             </div>
                           )
@@ -374,38 +369,34 @@ const DailyChallenge: React.FC = () => {
     <GameLayout className="max-w-5xl">
       {seo}
       {/* Top strip */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <span className="font-body font-semibold text-sm text-[#FFF8F0]">
-          ☀️ Today's five · {prettyDate(date)}
-        </span>
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3 border-b-2 border-ink pb-4">
+        <span className="type-label text-sm">Today's five · {prettyDate(date)}</span>
         <div className="flex items-center gap-2">
           {squares.map((s, i) => (
             <div
               key={i}
-              className={`w-3.5 h-3.5 rounded-[4px] ${
+              className={`w-4 h-4 ${
                 s === 'correct'
-                  ? 'bg-[#57E6D2]'
+                  ? 'bg-side-a'
                   : s === 'wrong'
-                    ? 'bg-[#FF6A6A]'
+                    ? 'bg-ink'
                     : s === 'current'
-                      ? 'bg-[#FF8552] ring-4 ring-[#FF8552]/25'
-                      : 'bg-white/10'
+                      ? 'border-4 border-ink bg-paper'
+                      : 'border-2 border-text-placeholder bg-paper'
               }`}
             />
           ))}
         </div>
         {streak > 0 ? (
-          <span className="font-body font-semibold text-sm text-[#FFC94D]">
-            🔥 {streak}-day streak
-          </span>
+          <span className="type-label text-sm">{streak}-day streak</span>
         ) : (
-          <span className="font-body text-sm text-[#6E77A8]">
+          <span className="type-label text-sm text-text-muted">
             Round {roundIndex + 1} of {rounds.length}
           </span>
         )}
       </div>
 
-      <h1 className="text-center font-display font-extrabold text-[38px] text-[#FFF8F0] mb-6">
+      <h1 className="text-center type-display text-[32px] md:text-[44px] leading-none mb-6">
         Which one's real?
       </h1>
 
@@ -413,22 +404,22 @@ const DailyChallenge: React.FC = () => {
         {phase === 'reveal' && roundResult ? (
           <motion.div
             key="reveal"
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="flex flex-col items-center gap-5"
           >
-            <div className="grid grid-cols-2 gap-6 w-full">
+            <div className="grid grid-cols-2 gap-4 w-full">
               {(['A', 'B'] as const).map((opt) => {
                 const url = opt === 'A' ? imageA : imageB
                 const isReal = opt === roundResult.correctChoice
+                const realBorder = opt === 'A' ? 'border-side-a' : 'border-side-b'
+                const realTag = opt === 'A' ? 'bg-side-a text-ink' : 'bg-side-b text-paper'
                 return (
                   <div
                     key={opt}
-                    className={`relative overflow-hidden rounded-[24px] border-4 aspect-[4/3] ${
-                      isReal
-                        ? 'border-[#57E6D2] shadow-[0_0_40px_rgba(87,230,210,0.25)]'
-                        : 'border-white/10'
+                    className={`relative overflow-hidden border-8 aspect-[4/3] ${
+                      isReal ? realBorder : 'border-ink'
                     }`}
                   >
                     <img
@@ -438,11 +429,11 @@ const DailyChallenge: React.FC = () => {
                       style={isReal ? undefined : { filter: 'saturate(.6) brightness(.8)' }}
                     />
                     <span
-                      className={`absolute top-3 left-3 rounded-full px-3 py-1 font-display font-extrabold text-sm ${
-                        isReal ? 'bg-[#57E6D2] text-[#151936]' : 'bg-[#FF6A6A] text-[#151936]'
+                      className={`absolute top-0 left-0 px-3 py-1.5 type-display text-sm md:text-base ${
+                        isReal ? realTag : 'bg-ink text-paper'
                       }`}
                     >
-                      {isReal ? '✓ REAL' : '🤖 AI'}
+                      {isReal ? 'Real' : 'AI'}
                     </span>
                   </div>
                 )
@@ -450,14 +441,16 @@ const DailyChallenge: React.FC = () => {
             </div>
 
             <h2
-              className="font-display font-extrabold text-3xl"
-              style={{ color: roundResult.correct ? '#57E6D2' : '#FF6A6A' }}
+              className={`type-display text-3xl md:text-4xl leading-none px-6 py-3 ${
+                roundResult.correct ? 'bg-side-a text-ink' : 'bg-ink text-paper'
+              }`}
             >
-              {roundResult.correct ? 'Nailed it!' : 'Fooled!'}
+              {roundResult.correct ? 'Nailed it.' : 'Fooled.'}
             </h2>
 
             <Button size="lg" className="w-full max-w-sm" onClick={handleNext}>
-              {roundIndex + 1 < rounds.length ? 'Next round →' : 'See results 🎯'}
+              {roundIndex + 1 < rounds.length ? 'Next round' : 'See results'}
+              <ArrowRight />
             </Button>
           </motion.div>
         ) : (
@@ -466,35 +459,27 @@ const DailyChallenge: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex flex-col items-center gap-6"
+            className="flex flex-col items-center gap-4"
           >
-            <div className="grid grid-cols-2 gap-6 w-full">
+            <div className="grid grid-cols-2 gap-4 w-full">
               {(['A', 'B'] as const).map((opt) => {
                 const url = opt === 'A' ? imageA : imageB
-                const badge =
-                  opt === 'A'
-                    ? 'bg-[#FF8552] text-[#151936] shadow-[0_4px_0_#C25327]'
-                    : 'bg-[#57E6D2] text-[#151936] shadow-[0_4px_0_#2FA391]'
+                const badge = opt === 'A' ? 'bg-side-a text-ink' : 'bg-side-b text-paper'
                 return (
                   <motion.div
                     key={opt}
-                    whileHover={{ y: -4 }}
-                    className="relative aspect-[4/3] cursor-zoom-in"
+                    className="relative aspect-[4/3] cursor-zoom-in border-4 border-ink overflow-hidden"
                     onClick={() => setZoomedImage(url)}
                   >
                     <div
-                      className={`absolute -top-3.5 -left-3.5 w-11 h-11 rounded-[14px] flex items-center justify-center font-display font-extrabold text-xl z-20 ${badge}`}
+                      className={`absolute top-0 left-0 w-11 h-11 md:w-14 md:h-14 flex items-center justify-center type-display text-xl md:text-2xl z-20 ${badge}`}
                     >
                       {opt}
                     </div>
-                    <img
-                      src={url}
-                      alt={`Option ${opt}`}
-                      className="w-full h-full object-cover rounded-[24px] border-[3px] border-white/10"
-                    />
+                    <img src={url} alt={`Option ${opt}`} className="w-full h-full object-cover" />
                     {opt === 'A' && (
-                      <span className="absolute bottom-3 right-3 flex items-center gap-1 rounded-full bg-[#151936]/70 backdrop-blur-sm px-3 py-1 font-body text-xs text-[#FFF8F0]">
-                        <ZoomIn className="w-3.5 h-3.5" /> tap to zoom
+                      <span className="absolute bottom-0 right-0 flex items-center gap-1.5 bg-ink text-paper px-3 py-1.5 type-label text-xs">
+                        <ZoomIn className="w-3.5 h-3.5" strokeWidth={3} /> Tap to zoom
                       </span>
                     )}
                   </motion.div>
@@ -502,16 +487,16 @@ const DailyChallenge: React.FC = () => {
               })}
             </div>
 
-            <div className="grid grid-cols-2 gap-6 w-full">
+            <div className="grid grid-cols-2 gap-4 w-full">
               <button
                 onClick={() => handleVote('A')}
-                className="h-16 rounded-[16px] bg-[#FF8552] text-[#151936] font-display font-extrabold text-lg shadow-[0_6px_0_#C25327] hover:translate-y-[2px] hover:shadow-[0_4px_0_#C25327] active:translate-y-[2px] active:shadow-[0_4px_0_#C25327] transition-all"
+                className="h-16 md:h-[72px] bg-side-a text-ink type-display text-base sm:text-xl md:text-2xl hover:brightness-[0.92] active:brightness-[0.84] transition-[filter] duration-150 cursor-pointer"
               >
                 A is real
               </button>
               <button
                 onClick={() => handleVote('B')}
-                className="h-16 rounded-[16px] bg-[#57E6D2] text-[#151936] font-display font-extrabold text-lg shadow-[0_6px_0_#2FA391] hover:translate-y-[2px] hover:shadow-[0_4px_0_#2FA391] active:translate-y-[2px] active:shadow-[0_4px_0_#2FA391] transition-all"
+                className="h-16 md:h-[72px] bg-side-b text-paper type-display text-base sm:text-xl md:text-2xl hover:brightness-[0.92] active:brightness-[0.84] transition-[filter] duration-150 cursor-pointer"
               >
                 B is real
               </button>
@@ -528,28 +513,25 @@ const DailyChallenge: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-ink p-4"
             onClick={() => setZoomedImage(null)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
+              initial={{ scale: 0.96, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: 'spring', damping: 22, stiffness: 300 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
               className="relative max-w-3xl w-full"
               onClick={(e) => e.stopPropagation()}
             >
               <button
                 onClick={() => setZoomedImage(null)}
-                className="absolute -top-3 -right-3 z-10 rounded-full bg-[#1F2450] border border-white/10 hover:border-[#FF8552] p-2 transition-colors"
+                aria-label="Close"
+                className="absolute -top-3 -right-3 z-10 w-11 h-11 flex items-center justify-center bg-paper text-ink border-4 border-ink hover:brightness-[0.92] transition-[filter] cursor-pointer"
               >
-                <X className="w-4 h-4 text-[#FFF8F0]" />
+                <X className="w-5 h-5" strokeWidth={3} />
               </button>
-              <img
-                src={zoomedImage}
-                alt="Zoomed"
-                className="w-full max-h-[85vh] object-contain rounded-[16px]"
-              />
+              <img src={zoomedImage} alt="Zoomed" className="w-full max-h-[85vh] object-contain" />
             </motion.div>
           </motion.div>
         )}
