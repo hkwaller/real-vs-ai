@@ -118,6 +118,22 @@
   h4 {
     font-family: 'Archivo', 'Arial Black', sans-serif;
   }
+  /* Anything you can tap shows the pointer, and taps don't flash grey on phones;
+     each control gives its own pressed state instead. */
+  button:not(:disabled),
+  [role='button'],
+  a[href],
+  label[for],
+  select,
+  summary {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
   :focus-visible {
     outline: 4px solid var(--focus-on-light);
     outline-offset: 2px;

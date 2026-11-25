@@ -3,73 +3,41 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, NO_EMOJI, Wordmark } from '@/components/Brand';
+import { ArrowRight, Wordmark } from '@/components/Brand';
 import { Check, Copy, Link2 } from 'lucide-react';
-import {
-  RoomProvider,
-  useOthers,
-  useMutation,
-  useStatus,
-  useStorage,
-  useEventListener,
-  LiveList,
-  LiveMap,
-  LiveObject,
-} from '@/liveblocks.config';
+import { PartyRoomProvider, hostGuestKey, usePartyRoom } from '@/hooks/usePartyRoom';
+import type { Settings as GameSettings } from '@/lib/partyRoom';
 import { useAdFree } from '@/hooks/useAdFree';
-
-interface GameSettings {
-  rounds: number;
-  timeLimit: number;
-  revealMode: 'instant' | 'after_round';
-}
 
 const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code, settings }) => {
   const navigate = useNavigate();
   const [copied, setCopied] = useState<'code' | 'link' | null>(null);
 
-  const others = useOthers();
-  const players = others
-    .filter((o) => !o.presence.isHost)
-    .map((o) => ({
-      id: o.presence.playerId,
-      name: o.presence.name,
-      emoji: o.presence.emoji,
-    }));
+  const { state, online, me, status, send } = usePartyRoom();
+  const isHost = !!state && !!me && state.hostId === me;
+  // Another screen is hosting this code right now.
+  const codeTaken = !!state && !!me && !!state.hostId && state.hostId !== me && online.has(state.hostId);
+  const isReady = status === 'connected' && isHost;
 
-  const status = useStatus();
-  const storageLoaded = useStorage((root) => root.gameStatus) !== null;
-  const isReady = status === 'connected' && storageLoaded;
-
-  const bossPlayerId = useStorage((root) => root.bossPlayerId ?? null);
+  const players = (state?.players ?? []).filter((p) => online.has(p.id));
+  const bossPlayerId = state?.bossId ?? null;
 
   // Tapping a player promotes them to boss; tapping the boss again clears it.
-  const setBoss = useMutation(({ storage }, id: string | null) => {
-    storage.set('bossPlayerId', id);
-  }, []);
+  const setBoss = (id: string | null) => send({ type: 'setBoss', playerId: id });
 
-  const writeSettings = useMutation(({ storage }, s: GameSettings) => {
-    const settingsObj = storage.get('settings');
-    settingsObj.set('rounds', s.rounds);
-    settingsObj.set('timeLimit', s.timeLimit);
-    settingsObj.set('revealMode', s.revealMode);
-  }, []);
-
-  useEffect(() => {
-    if (!isReady) return;
-    writeSettings(settings);
-  }, [isReady]);
-
-  // Host perk: stamp the host's ad-free status into the room so in-game ads are
-  // suppressed for everyone when the host is ad-free.
+  // Claim the room with this lobby's settings. Host perk: the host's ad-free status
+  // is stamped into the room so in-game ads are suppressed for everyone.
   const { isAdFree: hostIsAdFree } = useAdFree();
-  const startGame = useMutation(
-    ({ storage }, hostAdFree: boolean) => {
-      storage.set('hostAdFree', hostAdFree);
-      storage.get('gameStatus').set('value', 'playing');
-    },
-    [],
-  );
+  useEffect(() => {
+    if (status !== 'connected' || !state || codeTaken) return;
+    send({ type: 'open', settings, hostAdFree: hostIsAdFree });
+    // Re-send only when the connection or entitlement changes, not on every snapshot.
+  }, [status, !!state, codeTaken, hostIsAdFree]);
+
+  // The game is on (started here or by the boss's phone): move the big screen over.
+  useEffect(() => {
+    if (isHost && state?.status === 'playing') navigate(`/game/${code}`);
+  }, [isHost, state?.status]);
 
   const joinUrl = `${window.location.origin}/join?code=${code}`;
 
@@ -81,16 +49,22 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
 
   const handleStart = () => {
     if (!isReady) return;
-    startGame(hostIsAdFree);
-    navigate(`/game/${code}`);
+    send({ type: 'start' });
   };
 
-  // The boss can kick the game off from their own device.
-  useEventListener(({ event }) => {
-    if (event.type !== 'BOSS_START') return;
-    if (!bossPlayerId || event.playerId !== bossPlayerId) return;
-    handleStart();
-  });
+  if (codeTaken) {
+    return (
+      <main className="min-h-dvh bg-side-a text-ink px-4 md:px-14 py-10 flex flex-col justify-center gap-8">
+        <span className="type-label text-[clamp(14px,1.3vw,20px)]">Party code {code}</span>
+        <h1 className="type-display text-[clamp(44px,6vw,96px)] leading-[0.9]">This code is already in a game.</h1>
+        <div>
+          <Button variant="ink" size="lg" onClick={() => navigate('/create')}>
+            Start a new party <ArrowRight />
+          </Button>
+        </div>
+      </main>
+    );
+  }
 
   const settingsSummary = `${settings.rounds} rounds · ${settings.timeLimit} sec each · ${
     settings.revealMode === 'instant' ? 'live votes' : 'votes after the round'
@@ -209,6 +183,7 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
 
 const Lobby: React.FC = () => {
   const { code } = useParams<{ code: string }>();
+  const [hostKey] = useState(hostGuestKey);
   const location = useLocation();
   const settings = (location.state as GameSettings | null) ?? {
     rounds: 10,
@@ -219,35 +194,9 @@ const Lobby: React.FC = () => {
   if (!code) return null;
 
   return (
-    <RoomProvider
-      id={code}
-      initialPresence={{
-        name: 'Host',
-        emoji: NO_EMOJI,
-        playerId: 'host',
-        isHost: true,
-        hasVoted: false,
-        currentVote: null,
-        timeRemaining: null,
-      }}
-      initialStorage={{
-        gameStatus: new LiveObject({ value: 'waiting' }),
-        settings: new LiveObject({
-          rounds: settings.rounds,
-          timeLimit: settings.timeLimit,
-          revealMode: settings.revealMode,
-        }),
-        currentRoundIndex: new LiveObject({ value: 0 }),
-        rounds: new LiveList([]),
-        votes: new LiveMap(),
-        scores: new LiveMap(),
-        players: new LiveList([]),
-        hostAdFree: false,
-        bossPlayerId: null,
-      }}
-    >
+    <PartyRoomProvider code={code} guestKey={hostKey}>
       <LobbyContent code={code} settings={settings} />
-    </RoomProvider>
+    </PartyRoomProvider>
   );
 };
 

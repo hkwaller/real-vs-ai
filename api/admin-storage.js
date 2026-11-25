@@ -1,4 +1,4 @@
-import { createClerkClient, verifyToken } from '@clerk/backend'
+import { hasAdminSession } from '../server/admin-session.js'
 import { createClient } from '@supabase/supabase-js'
 
 // Admin-only writes to the `real-vs-ai` bucket. The bucket allows public reads
@@ -21,32 +21,11 @@ const missingEnv = Object.entries({
   .filter(([, v]) => !v)
   .map(([k]) => k)
 
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY })
 const supabase = missingEnv.length
   ? null
   : createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     })
-
-async function requireAdmin(req) {
-  const token = req.headers.authorization?.replace(/^Bearer /, '')
-  if (!token) {
-    console.warn(`admin-storage: no bearer token (user-agent: ${req.headers['user-agent']})`)
-    return false
-  }
-  try {
-    const { sub } = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY })
-    const user = await clerk.users.getUser(sub)
-    if (user.publicMetadata?.role !== 'admin') {
-      console.warn(`admin-storage: ${sub} is not an admin`)
-      return false
-    }
-    return true
-  } catch (err) {
-    console.warn('admin-storage: token verification failed:', err?.reason ?? err?.message ?? err)
-    return false
-  }
-}
 
 const isAllowedPath = (path) =>
   typeof path === 'string' && ALLOWED_PATH.test(path) && !path.includes('..')
@@ -61,7 +40,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: `Server misconfigured: missing ${missingEnv.join(', ')}` })
   }
 
-  if (!(await requireAdmin(req))) {
+  if (!(await hasAdminSession(req))) {
     return res.status(403).json({ error: 'Admins only' })
   }
 

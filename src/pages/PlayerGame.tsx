@@ -1,101 +1,81 @@
 // Future monetization boundary: only after the entire session has completed and final results are visible.
 // Consult playam-monetization.monetizationBreakReached; no ad SDK or event is invoked here.
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, NO_EMOJI } from '@/components/Brand'
+import { ArrowRight } from '@/components/Brand'
 import CountdownRing from '@/components/CountdownRing'
-import {
-  RoomProvider,
-  useStorage,
-  useMutation,
-  useUpdateMyPresence,
-  useEventListener,
-  useBroadcastEvent,
-  LiveList,
-  LiveMap,
-  LiveObject,
-} from '@/liveblocks.config'
+import { PartyRoomProvider, newGuestKey, usePartyRoom } from '@/hooks/usePartyRoom'
+import { GRACE_PERIOD, type Side } from '@/lib/partyRoom'
 
 type RoundResult = {
   didVote: boolean
   correct: boolean
-  correctChoice: 'A' | 'B'
+  correctChoice: Side
   points: number
 }
 
-const GRACE_PERIOD = 3
-
 const PlayerGameContent: React.FC<{
-  playerId: string
+  pid: string
   playerName: string
-  playerEmoji: string
-}> = ({ playerId, playerName, playerEmoji }) => {
+}> = ({ pid, playerName }) => {
   const navigate = useNavigate()
   const { code } = useParams<{ code: string }>()
-  const [hasVoted, setHasVoted] = useState(false)
-  const [voteChoice, setVoteChoice] = useState<'A' | 'B' | null>(null)
-  const [registered, setRegistered] = useState(false)
-  const [roundResult, setRoundResult] = useState<RoundResult | null>(null)
+  const { state, me, status, send } = usePartyRoom()
+  const playerId = me ?? ''
+  // Shown the moment the phone is tapped; the room's copy takes over when it lands.
+  // Keyed by round so a tap can never carry over into the next round.
+  const [pending, setPending] = useState<{ roundId: string; choice: Side } | null>(null)
   const [timeRemaining, setTimeRemaining] = useState<number>(15)
   const [streak, setStreak] = useState(0)
-  const voteChoiceRef = useRef<'A' | 'B' | null>(null)
   const roundStartTimeRef = useRef<number>(Date.now())
 
-  const updatePresence = useUpdateMyPresence()
+  const gameStatus = state?.status ?? null
+  const rounds = state?.rounds ?? null
+  const currentRoundIndex = state?.roundIndex ?? 0
+  const currentRound = rounds?.[currentRoundIndex] ?? null
+  const timeLimit = state?.settings.timeLimit ?? 15
+  const totalRounds = state?.settings.rounds ?? rounds?.length ?? 0
+  const bossPlayerId = state?.bossId ?? null
 
-  const gameStatus = useStorage((root) => root.gameStatus?.value ?? null)
-  const currentRoundIndexObj = useStorage((root) => root.currentRoundIndex)
-  const rounds = useStorage((root) => root.rounds)
-  const settingsObj = useStorage((root) => root.settings)
-  const scoresMap = useStorage((root) => root.scores)
-  const bossPlayerId = useStorage((root) => root.bossPlayerId ?? null)
+  const myVote = state?.votes[playerId]?.choice ?? null
+  const pendingChoice = pending && currentRound && pending.roundId === currentRound.id ? pending.choice : null
+  const voteChoice = myVote ?? pendingChoice
+  const hasVoted = voteChoice !== null
 
-  // The boss drives the game from their own device; the host display obeys.
-  const broadcast = useBroadcastEvent()
+  // The boss drives the game from their own device.
   const isBoss = bossPlayerId !== null && bossPlayerId === playerId
   const [bossCommandSent, setBossCommandSent] = useState(false)
 
-  const sendBossCommand = (type: 'BOSS_START' | 'BOSS_REVEAL' | 'BOSS_NEXT_ROUND') => {
+  const sendBossCommand = (type: 'start' | 'reveal' | 'next') => {
     if (!isBoss) return
     setBossCommandSent(true)
-    broadcast({ type, playerId })
+    send(type === 'start' ? { type } : { type, round: currentRoundIndex })
   }
 
-  const currentRoundIndex = currentRoundIndexObj?.value ?? 0
-  const currentRound = rounds?.[currentRoundIndex] ?? null
-  const timeLimit = settingsObj?.timeLimit ?? 15
-  const totalRounds = settingsObj?.rounds ?? rounds?.length ?? 0
-
-  const registerPlayer = useMutation(
-    ({ storage }) => {
-      const playerList = storage.get('players')
-      const scoreMap = storage.get('scores')
-      for (let i = 0; i < playerList.length; i++) {
-        if (playerList.get(i)?.id === playerId) return
-      }
-      playerList.push({ id: playerId, name: playerName, emoji: playerEmoji })
-      scoreMap.set(playerId, 0)
-    },
-    [playerId, playerName, playerEmoji],
-  )
-
+  // Take a seat (again after a reconnect if the room lost it, e.g. a host reset).
+  const inRoom = !!state?.players.some((p) => p.id === playerId)
+  const kicked = !!me && !!state?.kicked.includes(me)
+  const lastJoinRef = useRef(0)
   useEffect(() => {
-    if (registered || gameStatus === null) return
-    setRegistered(true)
-    registerPlayer()
-  }, [gameStatus, registered])
+    if (status !== 'connected' || !state || !me || inRoom || kicked) return
+    if (Date.now() - lastJoinRef.current < 3000) return
+    lastJoinRef.current = Date.now()
+    send({ type: 'join', name: playerName })
+  }, [status, state, me, inRoom, kicked])
+
+  // Removed by the host: forget this seat and go back to the join screen.
+  useEffect(() => {
+    if (!kicked) return
+    localStorage.removeItem(`rvai_player_${pid}`)
+    navigate('/join')
+  }, [kicked])
 
   // Countdown - resets when round changes
   useEffect(() => {
     roundStartTimeRef.current = Date.now()
     setTimeRemaining(timeLimit)
-    setHasVoted(false)
-    setVoteChoice(null)
-    voteChoiceRef.current = null
-    setRoundResult(null)
     setBossCommandSent(false)
-    updatePresence({ hasVoted: false, currentVote: null, timeRemaining: null })
 
     const interval = setInterval(() => {
       const elapsed = (Date.now() - roundStartTimeRef.current) / 1000
@@ -104,44 +84,47 @@ const PlayerGameContent: React.FC<{
     return () => clearInterval(interval)
   }, [currentRound?.id, timeLimit])
 
-  const handleVote = (choice: 'A' | 'B') => {
-    if (hasVoted) return
+  // A boss command that the room refused (or that raced the host) unlocks the button.
+  useEffect(() => {
+    setBossCommandSent(false)
+  }, [state?.status, state?.revealed, status])
+
+  const handleVote = (choice: Side) => {
+    if (hasVoted || !currentRound) return
     navigator.vibrate?.(10)
-    const elapsed = (Date.now() - roundStartTimeRef.current) / 1000
-    const remaining = Math.max(0, timeLimit - elapsed)
-    setVoteChoice(choice)
-    voteChoiceRef.current = choice
-    setHasVoted(true)
-    updatePresence({ hasVoted: true, currentVote: choice, timeRemaining: remaining })
+    setPending({ roundId: currentRound.id, choice })
   }
 
-  useEventListener(({ event }) => {
-    if (event.type !== 'PLAYER_KICKED') return
-    if (event.playerId !== playerId) return
-    if (playerId) localStorage.removeItem(`rvai_player_${playerId}`)
-    navigate('/join')
-  })
+  // Send the tapped vote, and send it again after a reconnect until the room has it.
+  const revealed = state?.revealed ?? false
+  useEffect(() => {
+    if (status !== 'connected' || !pendingChoice || myVote || revealed || !currentRound) return
+    send({ type: 'vote', round: currentRoundIndex, choice: pendingChoice })
+  }, [status, pendingChoice, myVote, revealed, currentRound?.id])
 
-  useEventListener(({ event }) => {
-    if (event.type !== 'ROUND_REVEALED') return
-    const { correctChoice, scores } = event
-    const myChoice = voteChoiceRef.current
-    if (!myChoice) {
-      setStreak(0)
-      setRoundResult({ didVote: false, correct: false, correctChoice, points: 0 })
-      return
-    }
-    const correct = myChoice === correctChoice
-    const points = scores[playerId] ?? 0
-    setStreak((s) => (correct ? s + 1 : 0))
-    setRoundResult({ didVote: true, correct, correctChoice, points })
-  })
+  // The round's result, straight from the room, so a reloaded phone still sees it.
+  const result = state?.revealed && state.result?.round === currentRoundIndex ? state.result : null
+  const roundResult: RoundResult | null = result
+    ? {
+        didVote: !!myVote,
+        correct: myVote === result.correctChoice,
+        correctChoice: result.correctChoice,
+        points: result.points[playerId] ?? 0,
+      }
+    : null
+
+  const lastStreakRoundRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!roundResult || !currentRound || lastStreakRoundRef.current === currentRound.id) return
+    lastStreakRoundRef.current = currentRound.id
+    setStreak((s) => (roundResult.correct ? s + 1 : 0))
+  }, [roundResult?.correctChoice, currentRound?.id])
 
   // Potential points right now (mirrors host scoring with this game's time limit).
   const scoringWindow = Math.max(1, timeLimit - GRACE_PERIOD)
   const potentialPoints =
     timeRemaining >= scoringWindow ? 100 : Math.round(100 * (timeRemaining / scoringWindow))
-  const myScore = scoresMap?.get(playerId) ?? 0
+  const myScore = state?.scores[playerId] ?? 0
 
   const upperName = playerName.toUpperCase()
   const metaLine = `${upperName} · ${myScore} PTS`
@@ -206,7 +189,7 @@ const PlayerGameContent: React.FC<{
           <Button
             size="bar"
             className="h-[120px]"
-            onClick={() => sendBossCommand('BOSS_START')}
+            onClick={() => sendBossCommand('start')}
             disabled={bossCommandSent}
           >
             {bossCommandSent ? 'Starting…' : 'Start the game'} <ArrowRight />
@@ -275,7 +258,7 @@ const PlayerGameContent: React.FC<{
           <Button
             size="bar"
             variant={realIsA ? 'ink' : 'default'}
-            onClick={() => sendBossCommand('BOSS_NEXT_ROUND')}
+            onClick={() => sendBossCommand('next')}
             disabled={bossCommandSent}
           >
             {bossCommandSent ? 'Loading…' : 'Next round'} <ArrowRight />
@@ -309,7 +292,7 @@ const PlayerGameContent: React.FC<{
           <Button
             variant="ink"
             size="bar"
-            onClick={() => sendBossCommand('BOSS_REVEAL')}
+            onClick={() => sendBossCommand('reveal')}
             disabled={bossCommandSent}
           >
             {bossCommandSent ? 'Revealing…' : 'Reveal now'}
@@ -370,59 +353,41 @@ const PlayerGameContent: React.FC<{
   )
 }
 
+type SavedPlayer = { name: string; emoji?: string; key?: string }
+
+function loadPlayer(pid: string | null): (SavedPlayer & { key: string }) | null {
+  if (!pid) return null
+  try {
+    const saved = JSON.parse(localStorage.getItem(`rvai_player_${pid}`) ?? 'null') as SavedPlayer | null
+    if (!saved?.name) return null
+    if (saved.key) return { ...saved, key: saved.key }
+    // A seat saved before rooms moved to Cloudflare: give it its own room key.
+    const withKey = { ...saved, key: newGuestKey() }
+    localStorage.setItem(`rvai_player_${pid}`, JSON.stringify(withKey))
+    return withKey
+  } catch {
+    return null
+  }
+}
+
 const PlayerGame: React.FC = () => {
   const { code } = useParams<{ code: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
 
-  const playerId = searchParams.get('pid')
-  const playerData = playerId
-    ? (() => {
-        try {
-          return JSON.parse(localStorage.getItem(`rvai_player_${playerId}`) ?? 'null') as {
-            name: string
-            emoji: string
-          } | null
-        } catch {
-          return null
-        }
-      })()
-    : null
-  const playerName = playerData?.name ?? ''
-  const playerEmoji = playerData?.emoji ?? NO_EMOJI
+  const pid = searchParams.get('pid')
+  const playerData = useMemo(() => loadPlayer(pid), [pid])
 
   useEffect(() => {
-    if (!playerId || !playerData) navigate(`/join${code ? `?code=${code}` : ''}`)
-  }, [playerId, playerData, navigate, code])
+    if (!pid || !playerData) navigate(`/join${code ? `?code=${code}` : ''}`)
+  }, [pid, playerData, navigate, code])
 
-  if (!playerId || !playerData || !code) return null
+  if (!pid || !playerData || !code) return null
 
   return (
-    <RoomProvider
-      id={code}
-      initialPresence={{
-        name: playerName,
-        emoji: playerEmoji,
-        playerId,
-        isHost: false,
-        hasVoted: false,
-        currentVote: null,
-        timeRemaining: null,
-      }}
-      initialStorage={{
-        gameStatus: new LiveObject({ value: 'waiting' }),
-        settings: new LiveObject({ rounds: 10, timeLimit: 15, revealMode: 'instant' }),
-        currentRoundIndex: new LiveObject({ value: 0 }),
-        rounds: new LiveList([]),
-        votes: new LiveMap(),
-        scores: new LiveMap(),
-        players: new LiveList([]),
-        hostAdFree: false,
-        bossPlayerId: null,
-      }}
-    >
-      <PlayerGameContent playerId={playerId} playerName={playerName} playerEmoji={playerEmoji} />
-    </RoomProvider>
+    <PartyRoomProvider code={code} guestKey={playerData.key}>
+      <PlayerGameContent pid={pid} playerName={playerData.name} />
+    </PartyRoomProvider>
   )
 }
 

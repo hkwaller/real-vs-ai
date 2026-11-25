@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { ArrowRight, NameBlock, NO_EMOJI, Wordmark } from '@/components/Brand'
 import Seo from '@/components/Seo'
 import { Loader2 } from 'lucide-react'
+import { newGuestKey } from '@/hooks/usePartyRoom'
 
 const CODE_LEN = 4
 
@@ -68,7 +69,7 @@ const JoinGame: React.FC = () => {
     const playerId = crypto.randomUUID()
     localStorage.setItem(
       `rvai_player_${playerId}`,
-      JSON.stringify({ name: name.trim(), emoji: NO_EMOJI }),
+      JSON.stringify({ name: name.trim(), emoji: NO_EMOJI, key: newGuestKey() }),
     )
     navigate(`/play/${code}?pid=${playerId}`)
   }

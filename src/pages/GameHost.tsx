@@ -8,132 +8,48 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { ArrowRight, NameBlock, NO_EMOJI, ReplayIcon, Wordmark } from '@/components/Brand'
+import { ArrowRight, NameBlock, ReplayIcon, Wordmark } from '@/components/Brand'
 import CountdownRing from '@/components/CountdownRing'
 import { supabase } from '@/lib/supabase'
 import { Users, UserX, X, Loader2 } from 'lucide-react'
-import {
-  RoomProvider,
-  useOthers,
-  useStorage,
-  useMutation,
-  useBroadcastEvent,
-  useEventListener,
-  useStatus,
-  LiveList,
-  LiveMap,
-  LiveObject,
-} from '@/liveblocks.config'
-
-type RoundData = { id: string; realImageUrl: string; aiImageUrl: string }
+import { PartyRoomProvider, hostGuestKey, usePartyRoom } from '@/hooks/usePartyRoom'
+import { correctChoiceOf, type RoundData } from '@/lib/partyRoom'
 
 const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const navigate = useNavigate()
-  const [timeLeft, setTimeLeft] = useState(0)
-  const [showResult, setShowResult] = useState(false)
-  const [initialized, setInitialized] = useState(false)
-  const initRunningRef = useRef(false)
+  // The countdown belongs to one round, so a fresh round never sees the last one's 0.
+  const [timer, setTimer] = useState<{ roundId: string | null; left: number }>({ roundId: null, left: 0 })
+  const timeLeft = timer.left
   const [showPlayersModal, setShowPlayersModal] = useState(false)
   const [confirmKickId, setConfirmKickId] = useState<string | null>(null)
   const [isReplacing, setIsReplacing] = useState(false)
+  const initRunningRef = useRef(false)
 
-  // In-game ads: hidden if the host started the game ad-free (host perk) or if
-  // this viewer is ad-free. The banner also self-gates on the local entitlement.
+  const { state, online, me, status, send } = usePartyRoom()
+  const isHost = !!state && !!me && state.hostId === me
 
-  const status = useStatus()
-
-  const roundsStorage = useStorage((root) => root.rounds)
-  const currentRoundIndexObj = useStorage((root) => root.currentRoundIndex)
-  const gameStatusObj = useStorage((root) => root.gameStatus)
-  const settingsObj = useStorage((root) => root.settings)
-  const storedPlayers = useStorage((root) => root.players)
-  const scores = useStorage((root) => root.scores)
-  const bossPlayerId = useStorage((root) => root.bossPlayerId ?? null)
-
-  const others = useOthers()
-  const broadcast = useBroadcastEvent()
-
-  // Rank of each player entering the current round (for ▲/▼ carets on reveal).
-  const prevRanksRef = useRef<Record<string, number>>({})
-  // Game-wide "fooled by the AI" tally.
-  const gameStatsRef = useRef({ totalVotes: 0, wrongVotes: 0 })
-
-  const currentRoundIndex = currentRoundIndexObj?.value ?? 0
-  const gameStatus = gameStatusObj?.value
-  const settings = settingsObj
-    ? {
-        rounds: settingsObj.rounds,
-        timeLimit: settingsObj.timeLimit,
-        revealMode: settingsObj.revealMode,
-      }
-    : null
+  const roundsStorage = state?.rounds ?? null
+  const currentRoundIndex = state?.roundIndex ?? 0
+  const gameStatus = state?.status
+  const settings = state?.settings ?? null
+  const storedPlayers = state?.players ?? null
+  const bossPlayerId = state?.bossId ?? null
+  const showResult = state?.revealed ?? false
 
   const currentRound: RoundData | null = roundsStorage?.[currentRoundIndex] ?? null
 
   const votes = useMemo(() => {
     const map: Record<string, 'A' | 'B'> = {}
-    others
-      .filter((o) => !o.presence.isHost && o.presence.hasVoted && o.presence.currentVote)
-      .forEach((o) => {
-        map[o.presence.playerId] = o.presence.currentVote!
-      })
+    for (const [pid, v] of Object.entries(state?.votes ?? {})) map[pid] = v.choice
     return map
-  }, [others])
+  }, [state?.votes])
 
   const players = useMemo(() => {
-    if (!storedPlayers || !scores) return []
-    return [...storedPlayers]
-      .map((p) => ({ ...p, score: scores.get(p.id) ?? 0 }))
+    if (!state) return []
+    return state.players
+      .map((p) => ({ ...p, score: state.scores[p.id] ?? 0 }))
       .sort((a, b) => b.score - a.score)
-  }, [storedPlayers, scores])
-
-  const storeRounds = useMutation(({ storage }, data: RoundData[]) => {
-    const roundsList = storage.get('rounds')
-    data.forEach((r) => roundsList.push(r))
-  }, [])
-
-  const advanceRound = useMutation(({ storage }, index: number) => {
-    storage.get('currentRoundIndex').set('value', index)
-  }, [])
-
-  const updateScores = useMutation(
-    ({ storage }, updates: { playerId: string; increment: number }[]) => {
-      const scoreMap = storage.get('scores')
-      for (const { playerId, increment } of updates) {
-        if (increment > 0) {
-          const current = scoreMap.get(playerId) ?? 0
-          scoreMap.set(playerId, current + increment)
-        }
-      }
-    },
-    [],
-  )
-
-  const finishGame = useMutation(({ storage }) => {
-    storage.get('gameStatus').set('value', 'finished')
-  }, [])
-
-  const resetGame = useMutation(({ storage }) => {
-    const roundsList = storage.get('rounds')
-    while (roundsList.length > 0) roundsList.delete(0)
-    const scoreMap = storage.get('scores')
-    const playerList = storage.get('players')
-    for (let i = 0; i < playerList.length; i++) {
-      const player = playerList.get(i)
-      if (player) scoreMap.set(player.id, 0)
-    }
-    storage.get('currentRoundIndex').set('value', 0)
-    storage.get('gameStatus').set('value', 'waiting')
-    // Clear the host perk so a rematch re-stamps it from the host at next start.
-    storage.set('hostAdFree', false)
-  }, [])
-
-  const replaceRound = useMutation(
-    ({ storage }, newRound: RoundData) => {
-      storage.get('rounds').set(currentRoundIndex, newRound)
-    },
-    [currentRoundIndex],
-  )
+  }, [state?.players, state?.scores])
 
   const fetchReplacementImage = async (): Promise<RoundData | null> => {
     const { data: files } = await supabase.storage.from('real-vs-ai').list('real')
@@ -161,27 +77,14 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
 
   const handleSkipPicture = async () => {
     setIsReplacing(true)
+    const round = currentRoundIndex
     const newRound = await fetchReplacementImage()
-    if (newRound) replaceRound(newRound)
+    if (newRound) send({ type: 'swap', round, data: newRound })
     setIsReplacing(false)
   }
 
-  const removePlayer = useMutation(({ storage }, id: string) => {
-    const playerList = storage.get('players')
-    const scoreMap = storage.get('scores')
-    for (let i = 0; i < playerList.length; i++) {
-      if (playerList.get(i)?.id === id) {
-        playerList.delete(i)
-        break
-      }
-    }
-    scoreMap.delete(id)
-  }, [])
-
-  const generateRoundsAsync = async (count: number, isCancelled: () => boolean = () => false) => {
+  const generateRoundsAsync = async (count: number): Promise<RoundData[]> => {
     const { data: files } = await supabase.storage.from('real-vs-ai').list('real')
-
-    let roundsData: RoundData[]
 
     if (files && files.length > 0) {
       const validFiles = files.filter(
@@ -208,89 +111,74 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
         selected.push(shuffled[i % shuffled.length])
       }
 
-      roundsData = selected.map((file) => ({
+      let hist = history
+      if (hist.date !== today) hist = { date: today, images: [] }
+      hist.images = [...new Set([...hist.images, ...selected.map((f) => f.name)])]
+      localStorage.setItem('real_vs_ai_shown_images', JSON.stringify(hist))
+
+      return selected.map((file) => ({
         id: crypto.randomUUID(),
         realImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`real/${file.name}`).data
           .publicUrl,
         aiImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`ai/${file.name}`).data
           .publicUrl,
       }))
-
-      const today2 = new Date().toISOString().split('T')[0]
-      let hist = JSON.parse(
-        localStorage.getItem('real_vs_ai_shown_images') || '{"date": "", "images": []}',
-      )
-      if (hist.date !== today2) hist = { date: today2, images: [] }
-      const newImages = selected.map((f) => f.name)
-      hist.images = [...new Set([...hist.images, ...newImages])]
-      localStorage.setItem('real_vs_ai_shown_images', JSON.stringify(hist))
-    } else {
-      roundsData = Array.from({ length: count }).map((_, i) => ({
-        id: crypto.randomUUID(),
-        realImageUrl: `https://picsum.photos/seed/real${i}/800/600`,
-        aiImageUrl: `https://picsum.photos/seed/ai${i}/800/600?blur=2`,
-      }))
     }
-
-    if (isCancelled()) return
-    storeRounds(roundsData)
-    setInitialized(true)
-    setTimeLeft(settings?.timeLimit ?? 15)
+    return Array.from({ length: count }).map((_, i) => ({
+      id: crypto.randomUUID(),
+      realImageUrl: `https://picsum.photos/seed/real${i}/800/600`,
+      aiImageUrl: `https://picsum.photos/seed/ai${i}/800/600?blur=2`,
+    }))
   }
 
+  // The game has started (here or from the boss's phone) but has no pairs yet:
+  // this screen picks them and hands them to the room.
+  const needsRounds = isHost && status === 'connected' && gameStatus === 'playing' && roundsStorage?.length === 0
   useEffect(() => {
-    if (
-      initRunningRef.current ||
-      status !== 'connected' ||
-      roundsStorage === null ||
-      settings === null
-    )
-      return
-
+    if (!needsRounds || !settings || initRunningRef.current) return
     initRunningRef.current = true
-    let cancelled = false
+    generateRoundsAsync(settings.rounds)
+      .then((rounds) => send({ type: 'setRounds', rounds }))
+      .finally(() => {
+        initRunningRef.current = false
+      })
+  }, [needsRounds])
 
-    if (roundsStorage.length === 0) {
-      generateRoundsAsync(settings.rounds, () => cancelled)
-    } else {
-      setInitialized(true)
-      setTimeLeft(settings.timeLimit)
+  // Back in the lobby state (a reload after "Play again"): go to the lobby.
+  useEffect(() => {
+    if (isHost && gameStatus === 'waiting') {
+      navigate(`/lobby/${code}`, { state: settings ?? undefined, replace: true })
     }
-
-    return () => {
-      cancelled = true
-      initRunningRef.current = false
-    }
-  }, [status, roundsStorage?.length ?? -1, settings?.rounds])
+  }, [isHost, gameStatus])
 
   const prevRoundIdRef = useRef<string | null>(null)
   useEffect(() => {
     if (!currentRound || currentRound.id === prevRoundIdRef.current) return
     prevRoundIdRef.current = currentRound.id
-
-    setShowResult(false)
-    setTimeLeft(settings?.timeLimit ?? 15)
+    setTimer({ roundId: currentRound.id, left: settings?.timeLimit ?? 15 })
     preloadNextRound(currentRoundIndex + 1)
   }, [currentRound?.id])
 
+  // Everyone still connected has voted (the server also checks this on each vote).
   useEffect(() => {
-    const presentPlayers = others.filter((o) => !o.presence.isHost)
-    const totalPlayers = presentPlayers.length
-    const totalVoted = presentPlayers.filter((o) => o.presence.hasVoted).length
-    if (totalPlayers > 0 && totalVoted === totalPlayers && !showResult && currentRound) {
+    if (!state || showResult || !currentRound) return
+    const present = state.players.filter((p) => online.has(p.id) || state.votes[p.id])
+    if (present.length > 0 && present.every((p) => state.votes[p.id])) {
       const timeout = setTimeout(() => revealResultRef.current(), 500)
       return () => clearTimeout(timeout)
     }
-  }, [others, showResult, currentRound])
+  }, [state, online, showResult, currentRound])
 
+  const timerIsLive = !!currentRound && timer.roundId === currentRound.id
   useEffect(() => {
-    if (timeLeft > 0 && !showResult) {
-      const timer = setInterval(() => setTimeLeft((t) => t - 1), 1000)
-      return () => clearInterval(timer)
-    } else if (timeLeft === 0 && !showResult && currentRound && initialized) {
-      revealResultRef.current()
+    if (!timerIsLive || showResult) return
+    if (timeLeft > 0) {
+      const interval = setInterval(() => setTimer((t) => ({ ...t, left: Math.max(0, t.left - 1) })), 1000)
+      return () => clearInterval(interval)
     }
-  }, [timeLeft, showResult, currentRound, initialized])
+    // Re-runs on reconnect, so a reveal sent while the socket was down is retried.
+    revealResultRef.current()
+  }, [timeLeft, showResult, timerIsLive, status])
 
   const revealResultRef = useRef<() => void>(() => {})
   useEffect(() => {
@@ -301,7 +189,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     return () => document.removeEventListener('keydown', handler)
   }, [])
 
-  // Confetti + history save when the game ends.
+  // History save when the game ends.
   useEffect(() => {
     if (gameStatus !== 'finished') return
     if (players.length > 0) {
@@ -323,75 +211,35 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     }
   }
 
+  // The server scores the round from its own clock; carrying the round index makes
+  // a repeat (timer + Space + all-voted) harmless.
   const revealResult = () => {
-    if (showResult) return
-    setShowResult(true)
-    if (!currentRound) return
-
-    const isRealLeft = currentRound.id.charCodeAt(0) % 2 === 0
-    const correctChoice = isRealLeft ? 'A' : 'B'
-    const tl = settings?.timeLimit ?? 15
-
-    // Snapshot ranking before this round's points land.
-    prevRanksRef.current = Object.fromEntries(players.map((p, i) => [p.id, i + 1]))
-
-    const results = others
-      .filter((o) => !o.presence.isHost && o.presence.hasVoted)
-      .map((o) => {
-        const choice = o.presence.currentVote
-        const tr = o.presence.timeRemaining ?? 0
-        const correct = choice === correctChoice
-        const gracePeriod = 3
-        const scoringWindow = tl - gracePeriod
-        const pts = tr >= scoringWindow ? 100 : Math.round(100 * (tr / scoringWindow))
-        return { playerId: o.presence.playerId, correct, increment: correct ? pts : 0 }
-      })
-
-    updateScores(results.map((r) => ({ playerId: r.playerId, increment: r.increment })))
-
-    gameStatsRef.current.totalVotes += results.length
-    gameStatsRef.current.wrongVotes += results.filter((r) => !r.correct).length
-
-    const scoresMap: Record<string, number> = {}
-    results.forEach((r) => {
-      scoresMap[r.playerId] = r.increment
-    })
-    broadcast({ type: 'ROUND_REVEALED', correctChoice, scores: scoresMap })
-
+    if (showResult || !currentRound) return
+    send({ type: 'reveal', round: currentRoundIndex })
   }
 
   revealResultRef.current = revealResult
 
   const handleKickPlayer = (id: string) => {
-    removePlayer(id)
-    broadcast({ type: 'PLAYER_KICKED', playerId: id })
+    send({ type: 'kick', playerId: id })
     setConfirmKickId(null)
   }
 
-  const nextRound = () => {
-    const nextIndex = currentRoundIndex + 1
-    if (!roundsStorage || nextIndex >= roundsStorage.length) {
-      finishGame()
-      broadcast({ type: 'GAME_OVER' })
-    } else {
-      advanceRound(nextIndex)
-    }
+  const nextRound = () => send({ type: 'next', round: currentRoundIndex })
+
+  if (state && me && state.hostId && !isHost) {
+    return (
+      <main className="min-h-dvh bg-side-a text-ink px-6 md:px-14 py-10 flex flex-col justify-center gap-8">
+        <span className="type-label text-[clamp(14px,1.3vw,20px)]">Party code {code}</span>
+        <h1 className="type-display text-[clamp(44px,6vw,96px)] leading-[0.9]">Another screen is hosting this party.</h1>
+        <div>
+          <Button variant="ink" size="lg" onClick={() => navigate('/')}>
+            Back home <ArrowRight />
+          </Button>
+        </div>
+      </main>
+    )
   }
-
-  // Boss remote control. Commands are only honoured from the player currently
-  // marked as boss in storage.
-  const nextRoundRef = useRef<() => void>(() => {})
-  nextRoundRef.current = nextRound
-  const showResultRef = useRef(showResult)
-  showResultRef.current = showResult
-
-  useEventListener(({ event }) => {
-    if (event.type !== 'BOSS_REVEAL' && event.type !== 'BOSS_NEXT_ROUND') return
-    if (!bossPlayerId || event.playerId !== bossPlayerId) return
-    if (event.type === 'BOSS_REVEAL') revealResultRef.current()
-    // Only advance from the reveal screen, so a round is never skipped unscored.
-    else if (showResultRef.current) nextRoundRef.current()
-  })
 
   // Loading state
   if (!gameStatus || !currentRound) {
@@ -412,7 +260,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   if (gameStatus === 'finished') {
     const winner = players[0]
     const rest = players.slice(1, 9)
-    const { totalVotes, wrongVotes } = gameStatsRef.current
+    const { totalVotes, wrongVotes } = state?.stats ?? { totalVotes: 0, wrongVotes: 0 }
     const fooledPct = totalVotes > 0 ? Math.round((wrongVotes / totalVotes) * 100) : null
     const winnerName = (winner?.name ?? 'Nobody').toUpperCase()
     // Fit names up to 12 characters across the orange field.
@@ -489,7 +337,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
           <Button
             className="h-[112px] px-11 text-[28px]"
             onClick={() => {
-              resetGame()
+              send({ type: 'rematch' })
               navigate(`/lobby/${code}`, {
                 state: {
                   rounds: settings?.rounds ?? 10,
@@ -508,10 +356,10 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
     )
   }
 
-  const isRealLeft = currentRound.id.charCodeAt(0) % 2 === 0
+  const correctChoice = correctChoiceOf(currentRound)
+  const isRealLeft = correctChoice === 'A'
   const leftImage = isRealLeft ? currentRound.realImageUrl : currentRound.aiImageUrl
   const rightImage = isRealLeft ? currentRound.aiImageUrl : currentRound.realImageUrl
-  const correctChoice: 'A' | 'B' = isRealLeft ? 'A' : 'B'
 
   const totalPlayers = storedPlayers?.length ?? 0
   const votedCount = Object.keys(votes).length
@@ -519,7 +367,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const totalRounds = roundsStorage?.length ?? settings?.rounds ?? 0
 
   const playerLookup = new Map(
-    (storedPlayers ?? []).map((p) => [p.id, { ...p, score: scores?.get(p.id) ?? 0 }]),
+    (storedPlayers ?? []).map((p) => [p.id, { ...p, score: state?.scores[p.id] ?? 0 }]),
   )
 
   const liveVotesVisible = settings?.revealMode === 'instant'
@@ -778,35 +626,14 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
 
 const GameHost: React.FC = () => {
   const { code } = useParams<{ code: string }>()
+  const [hostKey] = useState(hostGuestKey)
 
   if (!code) return null
 
   return (
-    <RoomProvider
-      id={code}
-      initialPresence={{
-        name: 'Host',
-        emoji: NO_EMOJI,
-        playerId: 'host',
-        isHost: true,
-        hasVoted: false,
-        currentVote: null,
-        timeRemaining: null,
-      }}
-      initialStorage={{
-        gameStatus: new LiveObject({ value: 'waiting' }),
-        settings: new LiveObject({ rounds: 10, timeLimit: 15, revealMode: 'instant' }),
-        currentRoundIndex: new LiveObject({ value: 0 }),
-        rounds: new LiveList([]),
-        votes: new LiveMap(),
-        scores: new LiveMap(),
-        players: new LiveList([]),
-        hostAdFree: false,
-        bossPlayerId: null,
-      }}
-    >
+    <PartyRoomProvider code={code} guestKey={hostKey}>
       <GameHostContent code={code} />
-    </RoomProvider>
+    </PartyRoomProvider>
   )
 }
 

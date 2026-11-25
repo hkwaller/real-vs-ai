@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { publicPages } from './public-pages.mjs'
 import path from 'path'
@@ -95,12 +95,48 @@ function staticSeo() {
   }
 }
 
+// `npm run dev` has no Vercel functions, so serve /api/party-auth (the room
+// ticket route) from Vite itself. `vercel dev` routes /api before this runs.
+function partyAuthDev(env) {
+  return {
+    name: 'party-auth-dev',
+    apply: 'serve',
+    configureServer(server) {
+      if (env.PARTY_SECRET && !process.env.PARTY_SECRET) process.env.PARTY_SECRET = env.PARTY_SECRET
+      server.middlewares.use('/api/party-auth', async (req, res) => {
+        const chunks = []
+        for await (const chunk of req) chunks.push(chunk)
+        let body = null
+        try {
+          body = JSON.parse(Buffer.concat(chunks).toString() || 'null')
+        } catch {
+          /* handler rejects a missing body */
+        }
+        const { default: handler } = await server.ssrLoadModule('/api/party-auth.js')
+        const reply = {
+          status(code) {
+            res.statusCode = code
+            return reply
+          },
+          setHeader: (k, v) => res.setHeader(k, v),
+          json(value) {
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify(value))
+            return reply
+          },
+        }
+        await handler(Object.assign(req, { body }), reply)
+      })
+    },
+  }
+}
+
 // https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react(), staticSeo()],
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), staticSeo(), partyAuthDev(loadEnv(mode, process.cwd(), ''))],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
-})
+}))

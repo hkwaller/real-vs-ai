@@ -12,13 +12,13 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import GameLayout from '@/components/GameLayout'
+import ImagePairStudio from '@/components/ImagePairStudio'
 import { useAuth, useUser } from '@clerk/react'
 import { supabase } from '@/lib/supabase'
 import { adminUpload, adminRemove } from '@/lib/adminStorage'
 import { fetchSchedule, saveSchedule, getTodayDate, type DailySchedule } from '@/lib/dailyChallenge'
 import {
   Loader2,
-  Send,
   Trash2,
   RefreshCw,
   Image as ImageIcon,
@@ -40,29 +40,8 @@ const AdminView: React.FC = () => {
   const { getToken } = useAuth()
   const isAdmin = user?.publicMetadata?.role === 'admin'
 
-  // Real Upload State
-  const [imageUrl, setImageUrl] = useState('')
-  const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null)
-  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null)
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const [previewError, setPreviewError] = useState<string | null>(null)
-  const [uploadLoading, setUploadLoading] = useState(false)
-  const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle')
-  const [prompt, setPrompt] = useState('')
-  const [generatedName, setGeneratedName] = useState('')
-
-  // AI Upload State
-  const [aiUploadLoading, setAiUploadLoading] = useState(false)
-  const [aiFile, setAiFile] = useState<File | null>(null)
-  const [aiUploadStatus, setAiUploadStatus] = useState<'idle' | 'success' | 'error'>('idle')
-  const [aiAssignedDate, setAiAssignedDate] = useState<string | null>(null)
-  const [aiCompressedKb, setAiCompressedKb] = useState<{ before: number; after: number } | null>(
-    null,
-  )
-  const aiFileInputRef = useRef<HTMLInputElement>(null)
-
   // Tab State
-  const [activeTab, setActiveTab] = useState<'images' | 'daily'>('images')
+  const [activeTab, setActiveTab] = useState<'drafts' | 'images' | 'daily'>('drafts')
 
   // Calendar State
   const [calendarYear, setCalendarYear] = useState(() => new Date().getFullYear())
@@ -170,113 +149,6 @@ const AdminView: React.FC = () => {
     }
   }
 
-  // For images.unsplash.com, append crop params so their CDN does entropy-based smart cropping
-  const buildFetchUrl = (url: string): string => {
-    try {
-      const u = new URL(url)
-      if (u.hostname === 'images.unsplash.com') {
-        u.searchParams.set('w', '1024')
-        u.searchParams.set('h', '1024')
-        u.searchParams.set('fit', 'crop')
-        u.searchParams.set('crop', 'entropy')
-        u.searchParams.set('q', '85')
-        return u.toString()
-      }
-    } catch {}
-    return url
-  }
-
-  const handleLoadImage = async () => {
-    if (!imageUrl.trim()) return
-    setPreviewLoading(true)
-    setPreviewError(null)
-    setPreviewDataUrl(null)
-    setPreviewBlob(null)
-    try {
-      const fetchUrl = buildFetchUrl(imageUrl.trim())
-      await new Promise<void>((resolve, reject) => {
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.onload = () => {
-          const size = Math.min(img.naturalWidth, img.naturalHeight)
-          const sx = (img.naturalWidth - size) / 2
-          const sy = (img.naturalHeight - size) / 2
-          const canvas = document.createElement('canvas')
-          canvas.width = 1024
-          canvas.height = 1024
-          canvas.getContext('2d')!.drawImage(img, sx, sy, size, size, 0, 0, 1024, 1024)
-          canvas.toBlob(
-            (blob) => {
-              if (!blob) {
-                reject(new Error('Canvas export failed'))
-                return
-              }
-              setPreviewBlob(blob)
-              setPreviewDataUrl(canvas.toDataURL('image/jpeg', 0.9))
-              resolve()
-            },
-            'image/jpeg',
-            0.9,
-          )
-        }
-        img.onerror = () =>
-          reject(
-            new Error(
-              "Couldn't load the image. Try using the direct image URL (right-click → Copy Image Address on Unsplash).",
-            ),
-          )
-        img.src = fetchUrl
-      })
-    } catch (e) {
-      setPreviewError((e as Error).message)
-    } finally {
-      setPreviewLoading(false)
-    }
-  }
-
-  const handleAiFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setAiFile(e.target.files[0])
-      setAiUploadStatus('idle')
-      setAiCompressedKb(null)
-      setAiAssignedDate(null)
-    }
-  }
-
-  const handleUpload = async () => {
-    if (!previewBlob) return
-    setUploadLoading(true)
-    setUploadStatus('idle')
-
-    const name = `img_${Date.now().toString(36)}`
-    setGeneratedName(name)
-
-    const formData = new FormData()
-    formData.append('name', name)
-    formData.append('image', new File([previewBlob], `${name}.jpg`, { type: 'image/jpeg' }))
-
-    try {
-      const response = await fetch(import.meta.env.VITE_N8N_API_URL as string, {
-        method: 'POST',
-        headers: { 'real-vs-ai-key': import.meta.env.VITE_API_KEY },
-        body: formData,
-      })
-      if (response.ok) {
-        setUploadStatus('success')
-        const data = await response.json()
-        setPrompt(data.prompt)
-        fetchImages()
-      } else {
-        setUploadStatus('error')
-      }
-    } catch (error) {
-      console.error('Error submitting form:', error)
-      setUploadStatus('error')
-    } finally {
-      setUploadLoading(false)
-    }
-  }
-
   const compressImage = (file: File, maxSize = 1024, quality = 0.85): Promise<Blob> =>
     new Promise((resolve, reject) => {
       const img = new Image()
@@ -299,66 +171,6 @@ const AdminView: React.FC = () => {
       img.onerror = () => reject(new Error('Failed to load image for compression'))
       img.src = url
     })
-
-  const handleAiUpload = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!aiFile) return
-
-    setAiUploadLoading(true)
-    setAiUploadStatus('idle')
-
-    try {
-      const compressed = await compressImage(aiFile)
-      setAiCompressedKb({
-        before: Math.round(aiFile.size / 1024),
-        after: Math.round(compressed.size / 1024),
-      })
-      await adminUpload(getToken, `ai/${generatedName}.jpg`, compressed, {
-        cacheControl: '0',
-        contentType: 'image/jpeg',
-      })
-
-      // Auto-assign to the first upcoming date with no challenge
-      const today = getTodayDate()
-      const scheduledDates = new Set(Object.keys(schedule))
-      let assignedDate: string | null = null
-      const candidate = new Date(today + 'T12:00:00')
-      for (let i = 0; i < 60; i++) {
-        const yyyy = candidate.getFullYear()
-        const mm = String(candidate.getMonth() + 1).padStart(2, '0')
-        const dd = String(candidate.getDate()).padStart(2, '0')
-        const dateStr = `${yyyy}-${mm}-${dd}`
-        if (!scheduledDates.has(dateStr)) {
-          assignedDate = dateStr
-          break
-        }
-        candidate.setDate(candidate.getDate() + 1)
-      }
-
-      if (assignedDate) {
-        const updated = { ...schedule, [assignedDate]: { images: [generatedName + '.jpg'] } }
-        await saveSchedule(updated, getToken)
-        setSchedule(updated)
-        // Jump calendar to that month so the user sees the assignment
-        const d = new Date(assignedDate + 'T12:00:00')
-        setCalendarMonth(d.getMonth())
-        setCalendarYear(d.getFullYear())
-        setSelectedDate(assignedDate)
-        setSelectedImages([generatedName + '.jpg'])
-      }
-
-      setAiUploadStatus(assignedDate ? 'success' : 'success')
-      setAiAssignedDate(assignedDate)
-      setAiFile(null)
-      if (aiFileInputRef.current) aiFileInputRef.current.value = ''
-      fetchImages()
-    } catch (error) {
-      console.error('Error uploading AI image:', error)
-      setAiUploadStatus('error')
-    } finally {
-      setAiUploadLoading(false)
-    }
-  }
 
   const handleDelete = async (filename: string) => {
     if (!confirm(`Are you sure you want to delete ${filename}?`)) return
@@ -475,7 +287,15 @@ const AdminView: React.FC = () => {
           <h1 className="type-display text-4xl leading-none mb-6">Admin dashboard.</h1>
 
           {/* Tab bar */}
-          <div className="flex w-fit mb-6 border-4 border-ink">
+          <div className="flex w-fit max-w-full flex-wrap mb-6 border-4 border-ink">
+            <button
+              onClick={() => setActiveTab('drafts')}
+              className={`px-4 py-2.5 type-label text-sm transition-colors cursor-pointer ${
+                activeTab === 'drafts' ? 'bg-ink text-paper' : 'text-ink hover:bg-muted'
+              }`}
+            >
+              Draft pairs
+            </button>
             <button
               onClick={() => setActiveTab('images')}
               className={`flex items-center gap-2 px-4 py-2.5 type-label text-sm transition-colors cursor-pointer ${
@@ -500,210 +320,11 @@ const AdminView: React.FC = () => {
             </button>
           </div>
 
+          {activeTab === 'drafts' && <ImagePairStudio getToken={getToken} onPublished={fetchImages} />}
+
           {activeTab === 'images' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Upload Section */}
-              <div className="lg:col-span-1 space-y-6">
-                {/* Real Image Upload */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <ImageIcon className="w-5 h-5 text-ink" strokeWidth={2.5} />
-                      Step 1: Real Image
-                    </CardTitle>
-                    <CardDescription>Paste an Unsplash URL to fetch & crop</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="type-label text-sm">Image URL</label>
-                      <div className="flex gap-2">
-                        <Input
-                          type="url"
-                          placeholder="https://images.unsplash.com/..."
-                          value={imageUrl}
-                          onChange={(e) => {
-                            setImageUrl(e.target.value)
-                            setPreviewDataUrl(null)
-                            setPreviewBlob(null)
-                            setPreviewError(null)
-                            setUploadStatus('idle')
-                          }}
-                          className="h-11 px-3 text-sm"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleLoadImage}
-                          disabled={previewLoading || !imageUrl.trim()}
-                          className="shrink-0"
-                        >
-                          {previewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Load'}
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Use the direct image URL - right-click → <em>Copy Image Address</em> on
-                        Unsplash. Unsplash images are auto-cropped by subject.
-                      </p>
-                    </div>
-
-                    {previewError && (
-                      <div className="p-3 bg-ink text-paper font-medium text-xs">
-                        {previewError}
-                      </div>
-                    )}
-
-                    {previewDataUrl && (
-                      <div className="space-y-3">
-                        <div className="aspect-square overflow-hidden border-4 border-ink">
-                          <img
-                            src={previewDataUrl}
-                            alt="Preview"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <p className="text-xs text-muted-foreground text-center">
-                          1024×1024 - looks good? Hit Send to n8n.
-                        </p>
-                      </div>
-                    )}
-
-                    {uploadStatus === 'success' && (
-                      <div className="p-3 border-4 border-ink text-ink font-medium text-xs space-y-2">
-                        <div className="font-bold">Prompt returned - use this in Gemini:</div>
-                        <div
-                          className="bg-muted p-2 break-words cursor-pointer hover:brightness-95 transition-[filter] select-all"
-                          title="Click to select all"
-                          onClick={(e) => {
-                            const range = document.createRange()
-                            range.selectNodeContents(e.currentTarget)
-                            window.getSelection()?.removeAllRanges()
-                            window.getSelection()?.addRange(range)
-                          }}
-                        >
-                          {prompt}
-                        </div>
-                        <p className="text-muted-foreground">
-                          File saved as{' '}
-                          <span className="text-ink font-semibold">{generatedName}.jpg</span>
-                        </p>
-                      </div>
-                    )}
-
-                    {uploadStatus === 'error' && (
-                      <div className="p-3 bg-ink text-paper font-medium text-xs text-center">
-                        Pipeline failed - check n8n.
-                      </div>
-                    )}
-                  </CardContent>
-                  <CardFooter>
-                    <Button
-                      variant="default"
-                      className="w-full"
-                      onClick={handleUpload}
-                      disabled={uploadLoading || !previewBlob}
-                    >
-                      {uploadLoading ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <Send className="h-5 w-5" />
-                      )}
-                      Send to n8n
-                    </Button>
-                  </CardFooter>
-                </Card>
-
-                {/* AI Image Upload */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <ImageIcon className="w-5 h-5 text-ink" strokeWidth={2.5} />
-                      Step 2: AI Image
-                    </CardTitle>
-                    <CardDescription>Upload generated AI image</CardDescription>
-                  </CardHeader>
-                  <form onSubmit={handleAiUpload}>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="type-label text-sm">AI Image</label>
-                        <div
-                          className="border-4 border-dashed border-ink p-4 text-center hover:border-side-b transition-colors cursor-pointer bg-paper"
-                          onClick={() => aiFileInputRef.current?.click()}
-                        >
-                          <input
-                            type="file"
-                            ref={aiFileInputRef}
-                            onChange={handleAiFileChange}
-                            accept="image/*"
-                            className="hidden"
-                            required
-                          />
-                          {aiFile ? (
-                            <div className="text-sm text-ink font-semibold truncate">
-                              {aiFile.name}
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                              <Upload className="w-6 h-6" />
-                              <span className="text-xs">Click to upload</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {aiUploadStatus === 'success' && (
-                        <div className="p-3 border-4 border-ink text-ink font-medium text-xs space-y-1">
-                          <div className="font-bold">AI image uploaded!</div>
-                          {aiCompressedKb && (
-                            <div className="text-muted-foreground">
-                              {aiCompressedKb.before > 1024
-                                ? `${(aiCompressedKb.before / 1024).toFixed(1)} MB`
-                                : `${aiCompressedKb.before} KB`}{' '}
-                              → <span className="text-ink font-semibold">{aiCompressedKb.after} KB</span> (
-                              {Math.round((1 - aiCompressedKb.after / aiCompressedKb.before) * 100)}
-                              % smaller)
-                            </div>
-                          )}
-                          {aiAssignedDate && (
-                            <div className="text-muted-foreground">
-                              Auto-assigned to{' '}
-                              <span className="text-ink font-semibold">
-                                {new Date(aiAssignedDate + 'T12:00:00').toLocaleDateString(
-                                  undefined,
-                                  {
-                                    weekday: 'short',
-                                    month: 'short',
-                                    day: 'numeric',
-                                  },
-                                )}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {aiUploadStatus === 'error' && (
-                        <div className="p-3 bg-ink text-paper font-medium text-xs text-center">
-                          Upload failed.
-                        </div>
-                      )}
-                    </CardContent>
-                    <CardFooter>
-                      <Button variant="secondary" className="w-full" type="submit">
-                        {aiUploadLoading ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <Send className="h-5 w-5" />
-                        )}
-                        Upload AI
-                      </Button>
-                    </CardFooter>
-                  </form>
-                </Card>
-              </div>
-
-              {/* List Section */}
-              <div className="lg:col-span-2">
+            <div>
+              <div>
                 <Card className="h-full">
                   <CardHeader>
                     <div className="flex items-center justify-between">

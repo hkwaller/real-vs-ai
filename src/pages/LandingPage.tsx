@@ -84,7 +84,7 @@ const LandingPage: React.FC = () => {
             <a href="/" className="py-3" aria-label="Real or AI home">
               <Wordmark />
             </a>
-            <a href="#daily" className={linkCls}>
+            <a href="#daily" className={`${linkCls} whitespace-nowrap`}>
               Daily challenge
             </a>
           </nav>
@@ -93,13 +93,28 @@ const LandingPage: React.FC = () => {
             <br />
             the<span className="md:sr-only"> fake.</span>
           </h1>
-          <div className="aspect-[4/3] w-full max-w-[min(100%,52vh)] md:self-end bg-side-a-tint">
+          <div className="aspect-[4/3] w-full max-w-[min(100%,46vh)] md:self-end bg-side-a-tint">
             {heroPair && (
               <img src={heroPair.a} alt="Photo A" className="w-full h-full object-cover" />
             )}
           </div>
-          <div className="flex justify-between items-end">
-            <span className="type-label text-base">Real?</span>
+          <div className="flex justify-between items-end gap-4">
+            <div className="flex flex-col gap-2 flex-1 md:flex-none min-w-0">
+              <button
+                type="button"
+                onClick={() => navigate('/create')}
+                className="h-14 md:h-[72px] px-4 md:px-7 bg-ink text-paper type-display text-lg md:text-[26px] whitespace-nowrap inline-flex items-center justify-between md:justify-start gap-3 hover:brightness-[1.3] transition-[filter]"
+              >
+                Start a party <ArrowRight />
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/join')}
+                className="md:hidden h-14 px-4 border-4 border-ink text-ink type-display text-lg whitespace-nowrap text-left hover:bg-ink hover:text-paper transition-colors"
+              >
+                I have a code
+              </button>
+            </div>
             <span className="type-display text-[clamp(80px,8vw,120px)] leading-[0.75]" aria-hidden="true">
               A
             </span>
@@ -129,44 +144,34 @@ const LandingPage: React.FC = () => {
             <br />
             <span className="invisible">.</span>
           </span>
-          <div className="aspect-[4/3] w-full max-w-[min(100%,52vh)] md:self-start bg-side-b-tint">
+          <div className="aspect-[4/3] w-full max-w-[min(100%,46vh)] md:self-start bg-side-b-tint">
             {heroPair && (
               <img src={heroPair.b} alt="Photo B" className="w-full h-full object-cover" />
             )}
           </div>
-          <div className="flex justify-between items-end">
+          <div className="flex justify-between items-end gap-4">
             <span className="type-display text-[clamp(80px,8vw,120px)] leading-[0.75]" aria-hidden="true">
               B
             </span>
-            <span className="type-label text-base">Or AI?</span>
-          </div>
-        </div>
-      </header>
-
-      {/* Ink band: the pitch and the one action */}
-      <section className="bg-ink text-paper on-dark">
-        <div className="max-w-[1280px] mx-auto px-4 md:px-14 py-16 flex flex-wrap items-center justify-between gap-8">
-          <p className="max-w-[32ch] font-semibold text-[clamp(20px,2vw,26px)] leading-[1.4]">
-            Two photos on the TV. One is real, one is AI. Everyone votes from their phone, and
-            faster right answers score more.
-          </p>
-          <div className="flex flex-wrap gap-3.5">
-            <button
-              type="button"
-              onClick={() => navigate('/create')}
-              className="h-[84px] px-8 bg-side-a text-ink type-display text-[28px] inline-flex items-center gap-3.5 hover:brightness-[0.92]"
-            >
-              Start a party <ArrowRight />
-            </button>
             <button
               type="button"
               onClick={() => navigate('/join')}
-              className="h-[84px] px-[30px] border-4 border-paper text-paper type-display text-[28px] hover:bg-paper hover:text-ink transition-colors"
+              className="hidden md:inline-flex items-center h-[72px] px-7 border-4 border-paper text-paper type-display text-[26px] hover:bg-paper hover:text-side-b transition-colors"
             >
               I have a code
             </button>
           </div>
-          <span className="basis-full type-label text-[15px] text-on-ink-muted">
+        </div>
+      </header>
+
+      {/* Ink band: how it plays (the actions live in the hero) */}
+      <section className="bg-ink text-paper on-dark">
+        <div className="max-w-[1280px] mx-auto px-4 md:px-14 py-12 md:py-16 flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
+          <p className="max-w-[36ch] font-semibold text-[clamp(20px,2vw,26px)] leading-[1.4]">
+            Two photos on the TV. One is real, one is AI. Everyone votes from their phone, and
+            faster right answers score more.
+          </p>
+          <span className="type-label text-[15px] text-on-ink-muted">
             Free to play · No account for your first games
           </span>
         </div>
