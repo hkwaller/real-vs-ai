@@ -7,6 +7,7 @@ const SignInPage: React.FC = () => (
   <GameLayout>
     <div className="flex justify-center">
       <SignIn
+        withSignUp
         routing="path"
         path="/sign-in"
         fallbackRedirectUrl="/dashboard"
