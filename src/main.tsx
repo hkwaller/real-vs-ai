@@ -4,6 +4,7 @@ import './index.css'
 import './lib/analytics'
 import App from './App.jsx'
 import { ClerkProvider } from '@clerk/react'
+import { clerkAppearance } from '@/lib/clerkAppearance'
 import { HelmetProvider } from '@dr.pogodin/react-helmet'
 
 const container = document.getElementById('root')!
@@ -11,7 +12,7 @@ const container = document.getElementById('root')!
 const app = (
   <StrictMode>
     <HelmetProvider>
-      <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-in" publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}>
+      <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-in" publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY} appearance={clerkAppearance}>
         <App />
       </ClerkProvider>
     </HelmetProvider>

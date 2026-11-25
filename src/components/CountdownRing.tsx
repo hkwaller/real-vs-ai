@@ -1,71 +1,55 @@
 import React from 'react'
+import { cn } from '@/lib/utils'
 
 interface CountdownRingProps {
   /** seconds remaining */
   value: number
-  /** total seconds in the round */
-  total: number
+  /** total seconds in the round (kept for callers; the disc shows only the value) */
+  total?: number
   /** outer diameter in px */
   size?: number
-  /** stroke width in px */
-  stroke?: number
-  /** show a "seconds" caption under the number */
+  /** small line under the number, e.g. "SEC" or "+92 PTS" */
+  caption?: string
+  /** @deprecated use caption */
   showCaption?: boolean
   className?: string
+  style?: React.CSSProperties
 }
 
 /**
- * Circular SVG countdown. Coral arc that drains with the timer; turns red and
- * pulses when 5 seconds or fewer remain.
+ * The seam timer: a white disc with an ink outline that sits on the line
+ * between A and B. The value turns orange in the last 3 seconds.
  */
 const CountdownRing: React.FC<CountdownRingProps> = ({
   value,
-  total,
-  size = 76,
-  stroke = 6,
+  size = 156,
+  caption,
   showCaption = false,
   className,
+  style,
 }) => {
-  const r = (size - stroke) / 2
-  const circumference = 2 * Math.PI * r
-  const pct = total > 0 ? Math.max(0, Math.min(1, value / total)) : 0
-  const offset = circumference * (1 - pct)
-  const urgent = value <= 5
-  const color = urgent ? '#FF6A6A' : '#FF8552'
+  const urgent = value <= 3
+  const border = Math.max(4, Math.round(size / 20))
+  const label = caption ?? (showCaption ? 'SEC' : undefined)
 
   return (
     <div
-      className={`relative inline-flex items-center justify-center ${urgent ? 'animate-pulse' : ''} ${className ?? ''}`}
-      style={{ width: size, height: size }}
+      className={cn('seam-disc shrink-0', className)}
+      style={{ width: size, height: size, borderWidth: border, ...style }}
+      role="timer"
+      aria-label={`${value} seconds left`}
     >
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth={stroke} />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s ease' }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span
-          className="font-display font-extrabold leading-none"
-          style={{ fontSize: size * 0.32, color: urgent ? '#FF6A6A' : '#FFF8F0' }}
-        >
-          {value}
+      <span
+        className="font-black leading-[0.9] tabular-nums font-wide"
+        style={{ fontSize: size * 0.4, color: urgent ? 'var(--side-a)' : 'var(--ink)' }}
+      >
+        {value}
+      </span>
+      {label && (
+        <span className="type-label" style={{ fontSize: Math.max(11, size * 0.09) }}>
+          {label}
         </span>
-        {showCaption && (
-          <span className="font-body text-[#9AA3D0]" style={{ fontSize: size * 0.11 }}>
-            seconds
-          </span>
-        )}
-      </div>
+      )}
     </div>
   )
 }

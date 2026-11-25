@@ -1,22 +1,19 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, Variants } from 'framer-motion'
 import { useAuth, UserButton } from '@clerk/react'
-import { Button } from '@/components/ui/button'
-import GameLayout from '@/components/GameLayout'
 import Seo from '@/components/Seo'
 import DailyChallengeCard from '@/components/DailyChallengeCard'
-import { LayoutDashboard } from 'lucide-react'
+import { ArrowRight, Wordmark } from '@/components/Brand'
+import { fetchSchedule, getImageUrls, getTodayDate } from '@/lib/dailyChallenge'
 
 interface GameRecord {
-  players?: { name: string; score: number; emoji?: string }[]
+  players?: { name: string; score: number }[]
 }
 
 interface LeaderEntry {
   rank: number
   name: string
   score: number
-  emoji: string
 }
 
 function useLeaderboard(): LeaderEntry[] {
@@ -26,212 +23,216 @@ function useLeaderboard(): LeaderEntry[] {
       if (!raw) return []
       const history: GameRecord[] = JSON.parse(raw)
       const totals: Record<string, number> = {}
-      const emojis: Record<string, string> = {}
       for (const game of history) {
         for (const p of game.players ?? []) {
           totals[p.name] = (totals[p.name] ?? 0) + p.score
-          if (p.emoji) emojis[p.name] = p.emoji
         }
       }
       return Object.entries(totals)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 3)
-        .map(([name, score], i) => ({
-          rank: i + 1,
-          name,
-          score,
-          emoji: emojis[name] ?? '🎮',
-        }))
+        .map(([name, score], i) => ({ rank: i + 1, name, score }))
     } catch {
       return []
     }
   }, [])
 }
 
-const containerVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.12 } },
+// A real pair from a past daily challenge for the hero (never today's, so nothing is spoiled).
+function useHeroPair(): { a: string; b: string } | null {
+  const [pair, setPair] = useState<{ a: string; b: string } | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetchSchedule()
+      .then((schedule) => {
+        if (!schedule || cancelled) return
+        const today = getTodayDate()
+        const past = Object.keys(schedule)
+          .filter((d) => d < today && schedule[d]?.images?.length)
+          .sort()
+        const date = past[past.length - 1]
+        const file = date ? schedule[date].images[0] : undefined
+        if (!file) return
+        const { realUrl, aiUrl } = getImageUrls(file)
+        setPair({ a: realUrl, b: aiUrl })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  return pair
 }
 
-const itemVariants: Variants = {
-  hidden: { y: 20, opacity: 0 },
-  visible: { y: 0, opacity: 1, transition: { type: 'spring', stiffness: 90 } },
-}
-
-// Sample party used only when there's no local history yet, so the hero feels alive.
-const SAMPLE_PARTY = [
-  { name: 'Maya', emoji: '🦊' },
-  { name: 'Jonas', emoji: '🤖' },
-  { name: 'Priya', emoji: '🥱' },
-]
-
-const SAMPLE_PODIUM: LeaderEntry[] = [
-  { rank: 1, name: 'Jonas', score: 840, emoji: '🤖' },
-  { rank: 2, name: 'Maya', score: 720, emoji: '🦊' },
-  { rank: 3, name: 'Priya', score: 610, emoji: '🥱' },
-]
-
-const Logo: React.FC = () => (
-  <div className="flex items-center gap-3">
-    <div className="w-9 h-9 rounded-[12px] bg-[#FF8552] -rotate-6 flex items-center justify-center shadow-[0_4px_0_#C25327]">
-      <span className="font-display font-extrabold text-[#151936] text-lg leading-none">R?</span>
-    </div>
-    <span className="font-display font-extrabold text-[#FFF8F0] text-lg">Real or AI</span>
-  </div>
-)
-
-const PlayerChip: React.FC<{ emoji: string; name: string }> = ({ emoji, name }) => (
-  <div className="flex items-center gap-2.5 rounded-[14px] bg-white/5 px-3 py-2.5">
-    <span className="text-xl leading-none">{emoji}</span>
-    <span className="font-display font-bold text-[#FFF8F0] text-sm truncate">{name}</span>
-  </div>
-)
+const linkCls = 'type-label text-base py-3 underline-offset-4 hover:underline'
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate()
   const { isSignedIn, isLoaded } = useAuth()
   const leaderboard = useLeaderboard()
-
-  const podium = leaderboard.length > 0 ? leaderboard : SAMPLE_PODIUM
-  const winner = podium.find((p) => p.rank === 1)
-  const byRank = (r: number) => podium.find((p) => p.rank === r)
-  const podiumHeights: Record<number, number> = { 1: 84, 2: 60, 3: 44 }
+  const champion = leaderboard[0]
+  const heroPair = useHeroPair()
 
   return (
-    <GameLayout className="max-w-6xl">
+    <div className="bg-paper text-ink overflow-x-hidden">
       <Seo title="Real or AI - Spot the fake. Beat your friends." path="/" />
-      {/* Header */}
-      {isLoaded && (
-        <div className="flex items-center justify-between mb-10">
-          <Logo />
-          <div className="flex items-center gap-3">
-            {isSignedIn ? (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full"
-                  onClick={() => navigate('/dashboard')}
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  Dashboard
-                </Button>
-                <UserButton />
-              </>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="rounded-full"
-                onClick={() => navigate('/sign-in')}
-              >
-                Sign in
-              </Button>
+
+      {/* Hero: the game itself, A against B */}
+      <header className="grid grid-cols-1 md:grid-cols-2">
+        <div className="bg-side-a text-ink px-4 md:px-14 pt-7 pb-10 flex flex-col gap-8">
+          <nav className="flex items-center justify-between gap-4">
+            <a href="/" className="py-3" aria-label="Real or AI home">
+              <Wordmark />
+            </a>
+            <a href="#daily" className={`${linkCls} whitespace-nowrap`}>
+              Daily challenge
+            </a>
+          </nav>
+          <h1 className="type-display text-[clamp(64px,9vw,150px)] leading-[0.84] tracking-[-0.04em]">
+            Spot
+            <br />
+            the<span className="md:sr-only"> fake.</span>
+          </h1>
+          <div className="aspect-[4/3] w-full max-w-[min(100%,46vh)] md:self-end bg-side-a-tint">
+            {heroPair && (
+              <img src={heroPair.a} alt="Photo A" className="w-full h-full object-cover" />
             )}
           </div>
-        </div>
-      )}
-
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="flex flex-col gap-8"
-      >
-        {/* Hero */}
-        <motion.div
-          variants={itemVariants}
-          className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-8 items-center"
-        >
-          {/* Left: headline + CTAs */}
-          <div>
-            <h1 className="font-display font-extrabold text-5xl md:text-[72px] leading-[0.95] tracking-tight text-[#FFF8F0]">
-              Spot the fake.
-              <br />
-              <span className="text-[#FF8552]">Beat your friends.</span>
-            </h1>
-            <p className="text-[#9AA3D0] text-lg mt-6 max-w-md">
-              Two photos. One is real, one is AI. You've got 15 seconds - good luck.
-            </p>
-            <div className="flex flex-wrap items-center gap-4 mt-8">
-              <Button size="lg" onClick={() => navigate('/create')}>
-                Start a party 🎉
-              </Button>
-              <Button variant="ghost" size="lg" onClick={() => navigate('/join')}>
+          <div className="flex justify-between items-end gap-4">
+            <div className="flex flex-col gap-2 flex-1 md:flex-none min-w-0">
+              <button
+                type="button"
+                onClick={() => navigate('/create')}
+                className="h-14 md:h-[72px] px-4 md:px-7 bg-ink text-paper type-display text-lg md:text-[26px] whitespace-nowrap inline-flex items-center justify-between md:justify-start gap-3 hover:brightness-[1.3] transition-[filter]"
+              >
+                Start a party <ArrowRight />
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/join')}
+                className="md:hidden h-14 px-4 border-4 border-ink text-ink type-display text-lg whitespace-nowrap text-left hover:bg-ink hover:text-paper transition-colors"
+              >
                 I have a code
-              </Button>
+              </button>
             </div>
-            <p className="text-[#6E77A8] text-sm mt-5">
-              Free to play - no account needed for your first games
-            </p>
+            <span className="type-display text-[clamp(80px,8vw,120px)] leading-[0.75]" aria-hidden="true">
+              A
+            </span>
           </div>
-
-          {/* Right: Live party card */}
-          <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
-            <div className="flex items-center justify-between mb-4">
-              <span className="font-display font-bold text-[#FFF8F0]">Live party</span>
-              <span className="flex items-center gap-2 rounded-full bg-[#57E6D2]/15 px-3 py-1">
-                <span className="w-2 h-2 rounded-full bg-[#57E6D2] animate-pulse" />
-                <span className="font-body font-semibold text-xs text-[#57E6D2]">
-                  4 playing now
-                </span>
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              {SAMPLE_PARTY.map((p) => (
-                <PlayerChip key={p.name} emoji={p.emoji} name={p.name} />
+        </div>
+        <div className="bg-side-b text-paper on-dark px-4 md:px-14 pt-7 pb-10 flex flex-col gap-8">
+          <nav className="flex items-center justify-end gap-6 min-h-12">
+            {isLoaded &&
+              (isSignedIn ? (
+                <>
+                  <button type="button" onClick={() => navigate('/dashboard')} className={linkCls}>
+                    Dashboard
+                  </button>
+                  <UserButton />
+                </>
+              ) : (
+                <button type="button" onClick={() => navigate('/sign-in')} className={linkCls}>
+                  Sign in
+                </button>
               ))}
-              <div className="flex items-center gap-2.5 rounded-[14px] border border-dashed border-white/15 px-3 py-2.5 text-[#6E77A8]">
-                <span className="text-xl leading-none">＋</span>
-                <span className="font-display font-bold text-sm">You?</span>
-              </div>
-            </div>
-            <div className="mt-3 rounded-[14px] bg-[#FFC94D]/12 px-3 py-2.5">
-              <span className="font-body text-sm text-[#FFC94D]">
-                🏆 Jonas is on a 5-round streak
-              </span>
-            </div>
+          </nav>
+          <span
+            className="hidden md:block type-display text-[clamp(64px,9vw,150px)] leading-[0.84] tracking-[-0.04em]"
+            aria-hidden="true"
+          >
+            Fake.
+            <br />
+            <span className="invisible">.</span>
+          </span>
+          <div className="aspect-[4/3] w-full max-w-[min(100%,46vh)] md:self-start bg-side-b-tint">
+            {heroPair && (
+              <img src={heroPair.b} alt="Photo B" className="w-full h-full object-cover" />
+            )}
           </div>
-        </motion.div>
+          <div className="flex justify-between items-end gap-4">
+            <span className="type-display text-[clamp(80px,8vw,120px)] leading-[0.75]" aria-hidden="true">
+              B
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate('/join')}
+              className="hidden md:inline-flex items-center h-[72px] px-7 border-4 border-paper text-paper type-display text-[26px] hover:bg-paper hover:text-side-b transition-colors"
+            >
+              I have a code
+            </button>
+          </div>
+        </div>
+      </header>
 
-        {/* Daily challenge + Hall of fame */}
-        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <DailyChallengeCard />
+      {/* Ink band: how it plays (the actions live in the hero) */}
+      <section className="bg-ink text-paper on-dark">
+        <div className="max-w-[1280px] mx-auto px-4 md:px-14 py-12 md:py-16 flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
+          <p className="max-w-[36ch] font-semibold text-[clamp(20px,2vw,26px)] leading-[1.4]">
+            Two photos on the TV. One is real, one is AI. Everyone votes from their phone, and
+            faster right answers score more.
+          </p>
+          <span className="type-label text-[15px] text-on-ink-muted">
+            Free to play · No account for your first games
+          </span>
+        </div>
+      </section>
 
-          {/* Hall of fame */}
-          <div className="rounded-[24px] border border-white/[0.07] bg-[#1F2450] p-6">
-            <h2 className="font-display font-bold text-[#FFF8F0] text-xl mb-5">Hall of fame</h2>
-            <div className="flex items-end justify-center gap-3 h-[140px]">
-              {[2, 1, 3].map((rank) => {
-                const p = byRank(rank)
-                const isWinner = rank === 1
-                return (
-                  <div key={rank} className="flex flex-col items-center gap-2 w-1/3">
-                    <span className="text-2xl leading-none">{p?.emoji ?? '❓'}</span>
-                    <div
-                      className={`w-full rounded-t-[14px] flex flex-col items-center justify-start pt-3 ${
-                        isWinner ? 'bg-[#FFC94D] text-[#151936]' : 'bg-white/5 text-[#9AA3D0]'
-                      }`}
-                      style={{ height: podiumHeights[rank] }}
-                    >
-                      <span className="font-display font-extrabold text-lg leading-none">
-                        {rank}
+      {/* Daily challenge and hall of fame */}
+      <section id="daily" className="grid grid-cols-1 md:grid-cols-2">
+        <DailyChallengeCard />
+        <article className="bg-paper text-ink px-4 md:px-14 py-12 md:py-[72px] flex flex-col gap-[22px]">
+          <span className="type-label text-base">Hall of fame · This device</span>
+          <h2 className="type-display text-[clamp(48px,5vw,80px)] leading-[0.88] break-words">
+            {champion ? `${champion.name} rules.` : 'No champion yet.'}
+          </h2>
+          <p className="font-medium text-[19px] leading-[1.45] text-text-muted max-w-[34ch]">
+            {champion
+              ? 'Total points across every party hosted on this screen.'
+              : 'Host a party on this screen and the top three land here, until someone beats them.'}
+          </p>
+          <ol className="flex flex-col mt-2.5">
+            {[1, 2, 3].map((rank) => {
+              const p = leaderboard.find((e) => e.rank === rank)
+              return (
+                <li
+                  key={rank}
+                  className={`flex items-baseline gap-[18px] py-3 border-t-2 border-ink ${rank === 1 ? 'border-t-4' : ''} ${rank === 3 ? 'border-b-2' : ''}`}
+                >
+                  <span className="type-display text-[32px] w-10">{rank}</span>
+                  {p ? (
+                    <>
+                      <span className="type-name text-2xl truncate">{p.name}</span>
+                      <span className="ml-auto type-label text-base tabular-nums">
+                        {p.score.toLocaleString()} pts
                       </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            <p className="text-[#6E77A8] text-sm text-center mt-4">
-              {winner
-                ? `${winner.name} holds the crown with ${winner.score.toLocaleString()} pts`
-                : 'Play a party to crown a champion'}
-            </p>
+                    </>
+                  ) : (
+                    <span className="type-label text-[17px] text-text-placeholder">Open</span>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+        </article>
+      </section>
+
+      <footer className="bg-ink text-paper on-dark">
+        <div className="max-w-[1280px] mx-auto px-4 md:px-14 pt-7 pb-9 flex flex-wrap items-center justify-between gap-4">
+          <Wordmark className="text-xl" />
+          <div className="flex flex-wrap gap-6">
+            <a href="/privacy" className={linkCls}>
+              Privacy
+            </a>
+            <a href="/terms" className={linkCls}>
+              Terms
+            </a>
+            <a href="https://playam.app" className={linkCls}>
+              A game from Playam
+            </a>
           </div>
-        </motion.div>
-      </motion.div>
-      <footer className="mx-auto flex flex-wrap justify-center gap-6 py-8 text-sm text-white"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://playam.app">A game from Playam</a></footer>
-    </GameLayout>
+        </div>
+      </footer>
+    </div>
   )
 }
 

@@ -1,7 +1,6 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth, RedirectToSignIn } from '@clerk/react'
 import LandingPage from './pages/LandingPage'
-import GenerateImage from './pages/GenerateImage'
 import AdminView from './pages/AdminView'
 import Lobby from './pages/Lobby'
 import JoinGame from './pages/JoinGame'
@@ -31,7 +30,7 @@ function App() {
         <Route path="/sign-up/*" element={<SignUpPage />} />
         <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} />} />
         <Route path="/admin" element={<ProtectedRoute element={<AdminView />} />} />
-        <Route path="/generate" element={<ProtectedRoute element={<GenerateImage />} />} />
+        <Route path="/generate" element={<Navigate to="/admin" replace />} />
         <Route path="/create" element={<CreateGame />} />
         <Route path="/join" element={<JoinGame />} />
         <Route path="/lobby/:code" element={<Lobby />} />

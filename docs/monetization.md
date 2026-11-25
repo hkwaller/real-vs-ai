@@ -9,7 +9,7 @@ Adsterra ads for free players, plus a Stripe "ad-free" upsell (day pass + monthl
 - Guests / signed-out users see ads. **Sign-in (Clerk) is required to buy.**
 - Entitlement is one timestamp on the Clerk user: `publicMetadata.adFreeUntil` (ISO). The day pass sets `now + 24h` (stacking onto remaining time); subscriptions push it to the current period end on each renewal webhook. Ads are hidden whenever `adFreeUntil` is in the future - one gate, both models. See `src/lib/entitlement.ts` (`isAdFree`).
 - `publicMetadata.adFreePlan` (`day`/`month`/`year`) and `publicMetadata.subscriptionActive` are for display + the "Manage subscription" button. The Stripe customer id is cached in `privateMetadata.stripeCustomerId`.
-- **Host perk:** when the host starts a game ad-free, `hostAdFree` is stamped into Liveblocks room storage (`Lobby` start mutation) so the whole room is ad-free. Reset on rematch (`GameHost` resetGame). See `src/hooks/useInGameAdsSuppressed.ts`.
+- **Host perk:** when the host starts a game ad-free, `hostAdFree` is stamped into the room state by the lobby's `open` action (`src/lib/partyRoom.ts`) so the whole room is ad-free. Reset on `rematch`. See `src/hooks/useInGameAdsSuppressed.ts`.
 
 ## Stripe account
 

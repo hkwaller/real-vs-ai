@@ -47,7 +47,7 @@ The `ish` project is shared with other apps. Its `order-files` bucket gives `aut
 
 ## Related, not done
 
-- **Players can work out the answer.** It isn't just `isRealLeft`: the round image URLs in Liveblocks storage contain `/real/` and `/ai/`, and any player can read them with the public key. The daily challenge leaks the same way through `schedule.json` and its URLs. A real fix needs neutral file names or an image proxy, with the real/AI mapping kept on the host or a server.
+- **Players can work out the answer.** It isn't just `isRealLeft`: the round image URLs in the room state contain `/real/` and `/ai/`, and every connected phone receives that state. The daily challenge leaks the same way through `schedule.json` and its URLs. A real fix needs neutral file names or an image proxy, with the real/AI mapping kept on the host or a server.
 - **The n8n webhook key ships in the browser bundle** (`VITE_API_KEY`), so anyone can trigger the image pipeline. To fix it, put the n8n call behind an `api/` route that checks for an admin.
 - **Other buckets in `ish` allow anon inserts** (`avatars`, `images`, `designs`, `spelling-bee-audio`). They belong to other apps and haven't been touched.
 - **Remove the temporary logging** in `api/admin-storage.js` (`admin-storage:` warnings) once everything is stable, or keep it if it's useful.

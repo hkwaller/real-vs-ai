@@ -1,102 +1,81 @@
 // Future monetization boundary: only after the entire session has completed and final results are visible.
 // Consult playam-monetization.monetizationBreakReached; no ad SDK or event is invoked here.
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import GameLayout from '@/components/GameLayout'
+import { ArrowRight } from '@/components/Brand'
 import CountdownRing from '@/components/CountdownRing'
-import { Loader2 } from 'lucide-react'
-import {
-  RoomProvider,
-  useStorage,
-  useMutation,
-  useUpdateMyPresence,
-  useEventListener,
-  useBroadcastEvent,
-  LiveList,
-  LiveMap,
-  LiveObject,
-} from '@/liveblocks.config'
+import { PartyRoomProvider, newGuestKey, usePartyRoom } from '@/hooks/usePartyRoom'
+import { GRACE_PERIOD, type Side } from '@/lib/partyRoom'
 
 type RoundResult = {
   didVote: boolean
   correct: boolean
-  correctChoice: 'A' | 'B'
+  correctChoice: Side
   points: number
 }
 
-const GRACE_PERIOD = 3
-
 const PlayerGameContent: React.FC<{
-  playerId: string
+  pid: string
   playerName: string
-  playerEmoji: string
-}> = ({ playerId, playerName, playerEmoji }) => {
+}> = ({ pid, playerName }) => {
   const navigate = useNavigate()
-  const [hasVoted, setHasVoted] = useState(false)
-  const [voteChoice, setVoteChoice] = useState<'A' | 'B' | null>(null)
-  const [registered, setRegistered] = useState(false)
-  const [roundResult, setRoundResult] = useState<RoundResult | null>(null)
+  const { code } = useParams<{ code: string }>()
+  const { state, me, status, send } = usePartyRoom()
+  const playerId = me ?? ''
+  // Shown the moment the phone is tapped; the room's copy takes over when it lands.
+  // Keyed by round so a tap can never carry over into the next round.
+  const [pending, setPending] = useState<{ roundId: string; choice: Side } | null>(null)
   const [timeRemaining, setTimeRemaining] = useState<number>(15)
   const [streak, setStreak] = useState(0)
-  const voteChoiceRef = useRef<'A' | 'B' | null>(null)
   const roundStartTimeRef = useRef<number>(Date.now())
 
-  const updatePresence = useUpdateMyPresence()
+  const gameStatus = state?.status ?? null
+  const rounds = state?.rounds ?? null
+  const currentRoundIndex = state?.roundIndex ?? 0
+  const currentRound = rounds?.[currentRoundIndex] ?? null
+  const timeLimit = state?.settings.timeLimit ?? 15
+  const totalRounds = state?.settings.rounds ?? rounds?.length ?? 0
+  const bossPlayerId = state?.bossId ?? null
 
-  const gameStatus = useStorage((root) => root.gameStatus?.value ?? null)
-  const currentRoundIndexObj = useStorage((root) => root.currentRoundIndex)
-  const rounds = useStorage((root) => root.rounds)
-  const settingsObj = useStorage((root) => root.settings)
-  const scoresMap = useStorage((root) => root.scores)
-  const bossPlayerId = useStorage((root) => root.bossPlayerId ?? null)
+  const myVote = state?.votes[playerId]?.choice ?? null
+  const pendingChoice = pending && currentRound && pending.roundId === currentRound.id ? pending.choice : null
+  const voteChoice = myVote ?? pendingChoice
+  const hasVoted = voteChoice !== null
 
-  // The boss drives the game from their own device; the host display obeys.
-  const broadcast = useBroadcastEvent()
+  // The boss drives the game from their own device.
   const isBoss = bossPlayerId !== null && bossPlayerId === playerId
   const [bossCommandSent, setBossCommandSent] = useState(false)
 
-  const sendBossCommand = (type: 'BOSS_START' | 'BOSS_REVEAL' | 'BOSS_NEXT_ROUND') => {
+  const sendBossCommand = (type: 'start' | 'reveal' | 'next') => {
     if (!isBoss) return
     setBossCommandSent(true)
-    broadcast({ type, playerId })
+    send(type === 'start' ? { type } : { type, round: currentRoundIndex })
   }
 
-  const currentRoundIndex = currentRoundIndexObj?.value ?? 0
-  const currentRound = rounds?.[currentRoundIndex] ?? null
-  const timeLimit = settingsObj?.timeLimit ?? 15
-  const totalRounds = settingsObj?.rounds ?? rounds?.length ?? 0
-
-  const registerPlayer = useMutation(
-    ({ storage }) => {
-      const playerList = storage.get('players')
-      const scoreMap = storage.get('scores')
-      for (let i = 0; i < playerList.length; i++) {
-        if (playerList.get(i)?.id === playerId) return
-      }
-      playerList.push({ id: playerId, name: playerName, emoji: playerEmoji })
-      scoreMap.set(playerId, 0)
-    },
-    [playerId, playerName, playerEmoji],
-  )
-
+  // Take a seat (again after a reconnect if the room lost it, e.g. a host reset).
+  const inRoom = !!state?.players.some((p) => p.id === playerId)
+  const kicked = !!me && !!state?.kicked.includes(me)
+  const lastJoinRef = useRef(0)
   useEffect(() => {
-    if (registered || gameStatus === null) return
-    setRegistered(true)
-    registerPlayer()
-  }, [gameStatus, registered])
+    if (status !== 'connected' || !state || !me || inRoom || kicked) return
+    if (Date.now() - lastJoinRef.current < 3000) return
+    lastJoinRef.current = Date.now()
+    send({ type: 'join', name: playerName })
+  }, [status, state, me, inRoom, kicked])
+
+  // Removed by the host: forget this seat and go back to the join screen.
+  useEffect(() => {
+    if (!kicked) return
+    localStorage.removeItem(`rvai_player_${pid}`)
+    navigate('/join')
+  }, [kicked])
 
   // Countdown - resets when round changes
   useEffect(() => {
     roundStartTimeRef.current = Date.now()
     setTimeRemaining(timeLimit)
-    setHasVoted(false)
-    setVoteChoice(null)
-    voteChoiceRef.current = null
-    setRoundResult(null)
     setBossCommandSent(false)
-    updatePresence({ hasVoted: false, currentVote: null, timeRemaining: null })
 
     const interval = setInterval(() => {
       const elapsed = (Date.now() - roundStartTimeRef.current) / 1000
@@ -105,296 +84,290 @@ const PlayerGameContent: React.FC<{
     return () => clearInterval(interval)
   }, [currentRound?.id, timeLimit])
 
-  const handleVote = (choice: 'A' | 'B') => {
-    if (hasVoted) return
+  // A boss command that the room refused (or that raced the host) unlocks the button.
+  useEffect(() => {
+    setBossCommandSent(false)
+  }, [state?.status, state?.revealed, status])
+
+  const handleVote = (choice: Side) => {
+    if (hasVoted || !currentRound) return
     navigator.vibrate?.(10)
-    const elapsed = (Date.now() - roundStartTimeRef.current) / 1000
-    const remaining = Math.max(0, timeLimit - elapsed)
-    setVoteChoice(choice)
-    voteChoiceRef.current = choice
-    setHasVoted(true)
-    updatePresence({ hasVoted: true, currentVote: choice, timeRemaining: remaining })
+    setPending({ roundId: currentRound.id, choice })
   }
 
-  useEventListener(({ event }) => {
-    if (event.type !== 'PLAYER_KICKED') return
-    if (event.playerId !== playerId) return
-    if (playerId) localStorage.removeItem(`rvai_player_${playerId}`)
-    navigate('/join')
-  })
+  // Send the tapped vote, and send it again after a reconnect until the room has it.
+  const revealed = state?.revealed ?? false
+  useEffect(() => {
+    if (status !== 'connected' || !pendingChoice || myVote || revealed || !currentRound) return
+    send({ type: 'vote', round: currentRoundIndex, choice: pendingChoice })
+  }, [status, pendingChoice, myVote, revealed, currentRound?.id])
 
-  useEventListener(({ event }) => {
-    if (event.type !== 'ROUND_REVEALED') return
-    const { correctChoice, scores } = event
-    const myChoice = voteChoiceRef.current
-    if (!myChoice) {
-      setStreak(0)
-      setRoundResult({ didVote: false, correct: false, correctChoice, points: 0 })
-      return
-    }
-    const correct = myChoice === correctChoice
-    const points = scores[playerId] ?? 0
-    setStreak((s) => (correct ? s + 1 : 0))
-    setRoundResult({ didVote: true, correct, correctChoice, points })
-  })
+  // The round's result, straight from the room, so a reloaded phone still sees it.
+  const result = state?.revealed && state.result?.round === currentRoundIndex ? state.result : null
+  const roundResult: RoundResult | null = result
+    ? {
+        didVote: !!myVote,
+        correct: myVote === result.correctChoice,
+        correctChoice: result.correctChoice,
+        points: result.points[playerId] ?? 0,
+      }
+    : null
+
+  const lastStreakRoundRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!roundResult || !currentRound || lastStreakRoundRef.current === currentRound.id) return
+    lastStreakRoundRef.current = currentRound.id
+    setStreak((s) => (roundResult.correct ? s + 1 : 0))
+  }, [roundResult?.correctChoice, currentRound?.id])
 
   // Potential points right now (mirrors host scoring with this game's time limit).
   const scoringWindow = Math.max(1, timeLimit - GRACE_PERIOD)
   const potentialPoints =
     timeRemaining >= scoringWindow ? 100 : Math.round(100 * (timeRemaining / scoringWindow))
-  const timeFraction = Math.max(0, Math.min(1, timeRemaining / timeLimit))
-  const myScore = scoresMap?.get(playerId) ?? 0
+  const myScore = state?.scores[playerId] ?? 0
+
+  const upperName = playerName.toUpperCase()
+  const metaLine = `${upperName} · ${myScore} PTS`
+  const roundLine = `ROUND ${currentRoundIndex + 1}/${totalRounds}`
 
   // Game over
   if (gameStatus === 'finished') {
     return (
-      <GameLayout>
-        <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-10 max-w-sm mx-auto text-center space-y-4">
-          <div className="text-5xl">🏁</div>
-          <h1 className="font-display font-extrabold text-3xl text-[#FFF8F0]">That's a wrap!</h1>
-          <p className="text-[#9AA3D0] text-sm">Check the big screen for the final standings.</p>
-          <Button variant="ghost" className="w-full" onClick={() => navigate('/')}>
-            Back home
-          </Button>
+      <main className="screen-phone bg-ink text-paper on-dark">
+        <div className="flex justify-between px-6 pt-6 type-label text-[15px]">
+          <span>{metaLine}</span>
+          <span>Final</span>
         </div>
-
-
-      </GameLayout>
+        <div className="flex-1 flex flex-col justify-center gap-5 px-6">
+          <h1 className="type-display text-[56px] leading-[0.9]">That's a wrap.</h1>
+          <p className="font-semibold text-lg leading-snug text-on-ink-muted">
+            The final standings are on the big screen.
+          </p>
+        </div>
+        <Button variant="paper" size="bar" onClick={() => navigate('/')}>
+          Back home <ArrowRight />
+        </Button>
+      </main>
     )
   }
 
-  // Waiting
+  // Waiting room
   if (gameStatus !== 'playing' || !currentRound) {
     return (
-      <GameLayout>
-        <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-10 max-w-sm mx-auto text-center space-y-4">
-          <Loader2 className="w-10 h-10 text-[#FF8552] mx-auto animate-spin" />
-          <h1 className="font-display font-extrabold text-2xl text-[#FFF8F0]">
-            Get ready, {playerName}
+      <main className="screen-phone bg-side-b text-paper on-dark">
+        <div className="flex justify-between px-6 pt-6 type-label text-[15px]">
+          <span>Real or AI · {code}</span>
+          {isBoss && <span className="bg-side-a text-ink px-2 py-1">Boss</span>}
+        </div>
+        <div className="flex-1 flex flex-col justify-center gap-5 px-6">
+          <h1 className="type-display text-[56px] leading-[0.9] break-words">
+            You're in,
+            <br />
+            {upperName}.
           </h1>
-          {isBoss ? (
+          <p className="font-medium text-lg leading-snug text-on-blue-muted">
+            {isBoss
+              ? 'You run this game. Start it when everyone has joined.'
+              : 'Eyes on the TV. The first pair shows up as soon as the game starts.'}
+          </p>
+          {!isBoss && (
+            <div className="flex gap-2 mt-2" aria-hidden="true">
+              <span className="w-[18px] h-[18px] bg-paper animate-pulse" />
+              <span className="w-[18px] h-[18px] bg-paper animate-pulse [animation-delay:200ms]" />
+              <span className="w-[18px] h-[18px] bg-paper animate-pulse [animation-delay:400ms]" />
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/join')}
+          className="self-start mx-6 py-3.5 type-label text-[15px] underline underline-offset-4"
+        >
+          Wrong code? Go back
+        </button>
+        {isBoss ? (
+          <Button
+            size="bar"
+            className="h-[120px]"
+            onClick={() => sendBossCommand('start')}
+            disabled={bossCommandSent}
+          >
+            {bossCommandSent ? 'Starting…' : 'Start the game'} <ArrowRight />
+          </Button>
+        ) : (
+          <div className="h-[120px] bg-ink text-paper flex items-center px-6 type-label text-[15px] pad-bottom-safe">
+            Waiting for the host to start
+          </div>
+        )}
+      </main>
+    )
+  }
+
+  // Round result
+  if (roundResult) {
+    const { correct, didVote, correctChoice, points } = roundResult
+    const realIsA = correctChoice === 'A'
+    const realBlock = realIsA ? 'bg-side-a text-ink' : 'bg-side-b text-paper on-dark'
+    const ground = correct ? 'bg-paper text-ink' : 'bg-ink text-paper on-dark'
+    return (
+      <main className={`screen-phone ${ground}`}>
+        <div className="flex justify-between px-6 pt-6 type-label text-[15px]">
+          <span>{metaLine}</span>
+          <span>{roundLine}</span>
+        </div>
+        <div className="flex-1 flex flex-col justify-center gap-4 px-6">
+          {correct ? (
             <>
-              <p className="text-[#FFC94D] font-body text-sm font-semibold">
-                👑 You're the boss — you run this game
-              </p>
-              <Button
-                size="lg"
-                className="w-full"
-                onClick={() => sendBossCommand('BOSS_START')}
-                disabled={bossCommandSent}
-              >
-                {bossCommandSent ? 'Starting…' : 'Start the game ▶'}
-              </Button>
+              <h1 className="type-display text-[48px] leading-[0.95]">
+                You
+                <br />
+                got it.
+              </h1>
+              <span className="type-display text-[clamp(110px,38vw,150px)] leading-[0.8] tracking-[-0.04em] text-side-a">
+                +{points}
+              </span>
+              {streak >= 2 && <span className="type-label text-lg">{streak} in a row</span>}
             </>
           ) : (
-            <p className="text-[#9AA3D0] text-sm">Waiting for the host to start…</p>
+            <>
+              <h1 className="type-display text-[clamp(44px,15vw,64px)] leading-[0.9]">
+                {didVote ? 'Fooled.' : 'Too slow.'}
+              </h1>
+              <p className="font-semibold text-xl leading-snug text-on-ink-muted">
+                {didVote
+                  ? `You picked the fake. ${correctChoice} was the real photo.`
+                  : `No vote this round. ${correctChoice} was the real photo.`}
+              </p>
+              <span className="type-label text-lg">
+                0 pts{didVote ? ' · streak reset' : ''}
+              </span>
+            </>
           )}
-          <button
-            onClick={() => navigate('/join')}
-            className="font-body text-sm text-[#6E77A8] hover:text-[#FFF8F0] transition-colors"
-          >
-            ← Wrong code? Go back
-          </button>
         </div>
-
-      </GameLayout>
-    )
-  }
-
-  // Result (3f)
-  if (roundResult) {
-    const correct = roundResult.correct
-    const ringColor = correct ? '#57E6D2' : '#FF6A6A'
-    return (
-      <GameLayout>
-        <div className="relative max-w-sm mx-auto flex flex-col items-center text-center pt-6">
-          {/* Confetti squares (correct only) */}
-          {correct &&
-            [
-              { x: -120, c: '#FFC94D' },
-              { x: 120, c: '#FF8552' },
-              { x: -150, c: '#FF8552' },
-              { x: 150, c: '#57E6D2' },
-              { x: -60, c: '#57E6D2' },
-              { x: 70, c: '#FFC94D' },
-            ].map((s, i) => (
-              <motion.div
-                key={i}
-                initial={{ y: -40, opacity: 0, rotate: 0 }}
-                animate={{ y: 40 + (i % 3) * 30, opacity: [0, 1, 1], rotate: 180 }}
-                transition={{ duration: 1.2, delay: i * 0.06 }}
-                className="absolute top-0 w-3 h-3 rounded-[3px]"
-                style={{ left: `calc(50% + ${s.x}px)`, backgroundColor: s.c }}
-              />
-            ))}
-
-          <div
-            className="w-28 h-28 rounded-full flex items-center justify-center text-5xl mb-6"
-            style={{ border: `4px solid ${ringColor}` }}
+        <div className={`${realBlock} h-[168px] flex items-center justify-between px-6 shrink-0`}>
+          <span className="type-display text-[30px] leading-none">
+            {correctChoice} was
+            <br />
+            real
+          </span>
+          <span className="type-display text-[150px] leading-[0.75]" aria-hidden="true">
+            {correctChoice}
+          </span>
+        </div>
+        {isBoss ? (
+          <Button
+            size="bar"
+            variant={realIsA ? 'ink' : 'default'}
+            onClick={() => sendBossCommand('next')}
+            disabled={bossCommandSent}
           >
-            {playerEmoji}
+            {bossCommandSent ? 'Loading…' : 'Next round'} <ArrowRight />
+          </Button>
+        ) : (
+          <div className="bg-ink text-paper px-6 pt-5 type-label text-[15px] pad-bottom-safe">
+            {currentRoundIndex + 1 >= totalRounds ? 'Results in a moment' : 'Next round in a moment'}
           </div>
-
-          <h1
-            className="font-display font-extrabold text-[38px] leading-none"
-            style={{ color: ringColor }}
-          >
-            {correct ? 'Nailed it!' : 'Fooled!'}
-          </h1>
-          <p className="text-[#9AA3D0] mt-3">
-            {correct ? `${roundResult.correctChoice} was the real photo` : 'That one was AI-made'}
-          </p>
-
-          {correct && roundResult.points > 0 && (
-            <div className="mt-5 rounded-[16px] border-2 border-[#FFC94D]/50 bg-[#FFC94D]/10 px-6 py-2.5">
-              <span className="font-display font-extrabold text-2xl text-[#FFC94D]">
-                +{roundResult.points} pts
-              </span>
-            </div>
-          )}
-
-          {correct && streak >= 2 && (
-            <div className="mt-4 rounded-full bg-white/5 px-4 py-2">
-              <span className="font-body font-semibold text-sm text-[#FFF8F0]">
-                🔥 {streak} in a row - keep it up
-              </span>
-            </div>
-          )}
-
-          {isBoss ? (
-            <Button
-              size="lg"
-              className="mt-8 w-full"
-              onClick={() => sendBossCommand('BOSS_NEXT_ROUND')}
-              disabled={bossCommandSent}
-            >
-              {bossCommandSent ? 'Loading…' : 'Next round →'}
-            </Button>
-          ) : (
-            <p className="font-body text-sm text-[#6E77A8] mt-8 animate-pulse">
-              Waiting for the next round…
-            </p>
-          )}
-        </div>
-      </GameLayout>
+        )}
+      </main>
     )
   }
 
-  const Header = (
-    <div className="flex items-center justify-between w-full">
-      <div className="flex items-center gap-3">
-        <span className="text-2xl leading-none">{playerEmoji}</span>
-        <div className="text-left">
-          <p className="font-display font-bold text-[#FFF8F0] leading-tight">
-            {playerName}
-            {isBoss && <span className="ml-1.5 text-[#FFC94D]">👑</span>}
-          </p>
-          <p className="font-body text-xs text-[#9AA3D0]">
-            Round {currentRoundIndex + 1} of {totalRounds}
-          </p>
+  // Locked in
+  if (hasVoted && voteChoice) {
+    const isA = voteChoice === 'A'
+    return (
+      <main className={`screen-phone ${isA ? 'bg-side-a text-ink' : 'bg-side-b text-paper on-dark'}`}>
+        <div className="flex justify-between px-6 pt-6 type-label text-[15px]">
+          <span>{metaLine}</span>
+          <span>{roundLine}</span>
         </div>
-      </div>
-      <span className="rounded-full bg-[#FFC94D]/15 px-3 py-1.5 font-display font-bold text-sm text-[#FFC94D]">
-        ⭐ {myScore}
-      </span>
-    </div>
-  )
+        <div className="flex-1 flex flex-col justify-center gap-3 px-6">
+          <span className="type-display text-[clamp(240px,85vw,340px)] leading-[0.74] tracking-[-0.04em] -ml-2.5" aria-hidden="true">
+            {voteChoice}
+          </span>
+          <h1 className="type-display text-[52px] leading-[0.9] mt-6">Locked in.</h1>
+          <p className="font-semibold text-lg leading-snug">You picked {voteChoice}. Eyes on the TV.</p>
+        </div>
+        {isBoss ? (
+          <Button
+            variant="ink"
+            size="bar"
+            onClick={() => sendBossCommand('reveal')}
+            disabled={bossCommandSent}
+          >
+            {bossCommandSent ? 'Revealing…' : 'Reveal now'}
+            <span className="type-label text-sm text-side-a">Boss</span>
+          </Button>
+        ) : (
+          <div className="h-[112px] bg-ink text-paper flex items-center justify-between px-6 pad-bottom-safe">
+            <span className="type-label text-[17px]">Waiting for the reveal</span>
+            <span className="type-display text-[30px] tabular-nums">0:{String(timeRemaining).padStart(2, '0')}</span>
+          </div>
+        )}
+      </main>
+    )
+  }
 
-  // Voting (2a) / locked-in
+  // Voting: the whole screen is the two buttons
   return (
-    <GameLayout>
-      <div className="max-w-sm mx-auto flex flex-col items-center gap-6">
-        {Header}
-
-        <AnimatePresence mode="wait">
-          {!hasVoted ? (
-            <motion.div
-              key="vote"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="w-full flex flex-col items-center gap-5"
-            >
-              <CountdownRing value={timeRemaining} total={timeLimit} size={120} showCaption />
-
-              <div className="text-center">
-                <h2 className="font-display font-extrabold text-2xl text-[#FFF8F0]">
-                  Which one's real?
-                </h2>
-                <p className="text-[#9AA3D0] text-sm mt-1">
-                  Look at the big screen - faster answers score more
-                </p>
-              </div>
-
-              <button
-                onClick={() => handleVote('A')}
-                className="w-full h-[104px] rounded-[18px] bg-[#FF8552] text-[#151936] font-display font-extrabold text-5xl -rotate-1 shadow-[0_6px_0_#C25327] active:translate-y-[3px] active:shadow-[0_3px_0_#C25327] transition-all"
-              >
-                A
-              </button>
-              <button
-                onClick={() => handleVote('B')}
-                className="w-full h-[104px] rounded-[18px] bg-[#57E6D2] text-[#151936] font-display font-extrabold text-5xl rotate-1 shadow-[0_6px_0_#2FA391] active:translate-y-[3px] active:shadow-[0_3px_0_#2FA391] transition-all"
-              >
-                B
-              </button>
-
-              {/* Speed bonus bar */}
-              <div className="w-full">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-body text-sm text-[#9AA3D0]">Speed bonus</span>
-                  <span className="font-display font-bold text-sm text-[#FFC94D]">
-                    +{potentialPoints} pts if you tap now
-                  </span>
-                </div>
-                <div className="h-2.5 w-full rounded-full bg-white/5 overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-[width] duration-200 ease-linear"
-                    style={{
-                      width: `${timeFraction * 100}%`,
-                      background: 'linear-gradient(90deg, #FFC94D, #FF8552)',
-                    }}
-                  />
-                </div>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="locked"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              className="w-full"
-            >
-              <div className="rounded-[28px] border border-white/[0.07] bg-[#1F2450] p-10 text-center space-y-4">
-                <div
-                  className={`font-display font-extrabold text-7xl ${
-                    voteChoice === 'A' ? 'text-[#FF8552]' : 'text-[#57E6D2]'
-                  }`}
-                >
-                  {voteChoice}
-                </div>
-                <h2 className="font-display font-extrabold text-2xl text-[#FFF8F0]">Locked in!</h2>
-                <p className="font-body text-sm text-[#9AA3D0]">
-                  You picked {voteChoice}. Watch the big screen…
-                </p>
-                {isBoss && (
-                  <Button
-                    variant="secondary"
-                    className="w-full"
-                    onClick={() => sendBossCommand('BOSS_REVEAL')}
-                    disabled={bossCommandSent}
-                  >
-                    👑 Reveal now
-                  </Button>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </GameLayout>
+    <main className="h-dvh flex flex-col relative overflow-hidden">
+      <button
+        type="button"
+        onClick={() => handleVote('A')}
+        aria-label="Vote A"
+        className="flex-1 bg-side-a text-ink flex flex-col justify-between px-6 pb-7 text-left active:brightness-[0.88]"
+        style={{ paddingTop: 'max(24px, env(safe-area-inset-top, 0px))' }}
+      >
+        <span className="flex flex-col gap-4 w-full">
+          <span className="flex justify-between w-full type-label text-[15px]">
+            <span>
+              {metaLine}
+              {isBoss ? ' · BOSS' : ''}
+            </span>
+            <span>{roundLine}</span>
+          </span>
+          <span className="type-display text-[30px] leading-[0.95]">Which one's real?</span>
+        </span>
+        <span className="type-display self-end text-[clamp(150px,50vw,220px)] leading-[0.74] tracking-[-0.04em]">
+          A
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={() => handleVote('B')}
+        aria-label="Vote B"
+        className="flex-1 bg-side-b text-paper flex flex-col justify-between px-6 pt-7 text-left active:brightness-[0.88] on-dark"
+        style={{ paddingBottom: 'max(28px, env(safe-area-inset-bottom, 0px))' }}
+      >
+        <span className="type-display text-[clamp(150px,50vw,220px)] leading-[0.74] tracking-[-0.04em]">B</span>
+        <span className="type-label text-[15px] self-end">Faster scores more</span>
+      </button>
+      <CountdownRing
+        value={timeRemaining}
+        total={timeLimit}
+        size={118}
+        caption={`+${potentialPoints} PTS`}
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+      />
+    </main>
   )
+}
+
+type SavedPlayer = { name: string; emoji?: string; key?: string }
+
+function loadPlayer(pid: string | null): (SavedPlayer & { key: string }) | null {
+  if (!pid) return null
+  try {
+    const saved = JSON.parse(localStorage.getItem(`rvai_player_${pid}`) ?? 'null') as SavedPlayer | null
+    if (!saved?.name) return null
+    if (saved.key) return { ...saved, key: saved.key }
+    // A seat saved before rooms moved to Cloudflare: give it its own room key.
+    const withKey = { ...saved, key: newGuestKey() }
+    localStorage.setItem(`rvai_player_${pid}`, JSON.stringify(withKey))
+    return withKey
+  } catch {
+    return null
+  }
 }
 
 const PlayerGame: React.FC = () => {
@@ -402,54 +375,19 @@ const PlayerGame: React.FC = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
 
-  const playerId = searchParams.get('pid')
-  const playerData = playerId
-    ? (() => {
-        try {
-          return JSON.parse(localStorage.getItem(`rvai_player_${playerId}`) ?? 'null') as {
-            name: string
-            emoji: string
-          } | null
-        } catch {
-          return null
-        }
-      })()
-    : null
-  const playerName = playerData?.name ?? ''
-  const playerEmoji = playerData?.emoji ?? '😀'
+  const pid = searchParams.get('pid')
+  const playerData = useMemo(() => loadPlayer(pid), [pid])
 
   useEffect(() => {
-    if (!playerId || !playerData) navigate(`/join${code ? `?code=${code}` : ''}`)
-  }, [playerId, playerData, navigate, code])
+    if (!pid || !playerData) navigate(`/join${code ? `?code=${code}` : ''}`)
+  }, [pid, playerData, navigate, code])
 
-  if (!playerId || !playerData || !code) return null
+  if (!pid || !playerData || !code) return null
 
   return (
-    <RoomProvider
-      id={code}
-      initialPresence={{
-        name: playerName,
-        emoji: playerEmoji,
-        playerId,
-        isHost: false,
-        hasVoted: false,
-        currentVote: null,
-        timeRemaining: null,
-      }}
-      initialStorage={{
-        gameStatus: new LiveObject({ value: 'waiting' }),
-        settings: new LiveObject({ rounds: 10, timeLimit: 15, revealMode: 'instant' }),
-        currentRoundIndex: new LiveObject({ value: 0 }),
-        rounds: new LiveList([]),
-        votes: new LiveMap(),
-        scores: new LiveMap(),
-        players: new LiveList([]),
-        hostAdFree: false,
-        bossPlayerId: null,
-      }}
-    >
-      <PlayerGameContent playerId={playerId} playerName={playerName} playerEmoji={playerEmoji} />
-    </RoomProvider>
+    <PartyRoomProvider code={code} guestKey={playerData.key}>
+      <PlayerGameContent pid={pid} playerName={playerData.name} />
+    </PartyRoomProvider>
   )
 }
 

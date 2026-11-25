@@ -1,0 +1,214 @@
+{
+  "name": "Real vs AI | Generate image pair",
+  "nodes": [
+    {
+      "id": "f5a5d6f0-5905-49a8-8287-802a076563b0",
+      "name": "Accept pair job",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "real-vs-ai-image-pairs",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "9acf312d-bb9f-4b9c-922b-12c731ae9fd3"
+    },
+    {
+      "id": "9b02fb36-62bf-4c18-9920-b69e02edf76e",
+      "name": "Acknowledge job",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"accepted\":true}",
+        "options": {
+          "responseCode": 202
+        }
+      }
+    },
+    {
+      "id": "1d467b2e-9caf-490d-b240-00e93f9e41ff",
+      "name": "Generate counterpart",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/edits",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: 'gpt-image-2.6-flare',\n  images: [{ image_url: $('Accept pair job').first().json.body.imageUrl }],\n  prompt: 'Create an independent photorealistic photograph of the same kind of scene as the reference. Match the square framing, subject placement, perspective, lighting, depth of field and natural color palette. Resynthesize the entire scene with small visible differences in incidental details. Preserve credible real-world textures and optics. Do not add text, watermarks, borders or graphics.',\n  size: '1024x1024',\n  quality: 'medium',\n  output_format: 'jpeg',\n  output_compression: 90\n} }}",
+        "options": {
+          "timeout": 240000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "be1e7350-b09e-40c4-ac79-ed0ca81e2bdb",
+      "name": "Decode JPEG",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "data.0.b64_json",
+        "binaryPropertyName": "image",
+        "options": {
+          "fileName": "counterpart.jpg",
+          "mimeType": "image/jpeg"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "b3eb467c-bd11-4a65-a8de-de3a3bee521d",
+      "name": "Save counterpart",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $('Accept pair job').first().json.body.outputUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "image/jpeg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "image",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "5e40c1f4-6f7f-4c28-8bb8-6e3082d35929",
+      "name": "Record generation failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        240
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $('Accept pair job').first().json.body.failureUrl }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"error\":\"generation_failed\"}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Accept pair job": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge job": {
+      "main": [
+        [
+          {
+            "node": "Generate counterpart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate counterpart": {
+      "main": [
+        [
+          {
+            "node": "Decode JPEG",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record generation failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decode JPEG": {
+      "main": [
+        [
+          {
+            "node": "Save counterpart",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record generation failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save counterpart": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Record generation failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": 300,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  }
+}

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import GameLayout from '@/components/GameLayout'
 import Seo from '@/components/Seo'
-import { Loader2, Calendar, Trophy, Home, Play, CheckCircle2, XCircle } from 'lucide-react'
+import { Loader2, Calendar, Trophy, Home, Play, Check, X } from 'lucide-react'
 import {
   fetchSchedule,
   getDailyScores,
@@ -67,13 +67,11 @@ const DailyChallengeArchive: React.FC = () => {
           description="Browse and replay every past Real-or-AI daily challenge. See if you can still spot the AI-generated photo."
           path="/daily/archive"
         />
-        <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-10 max-w-sm mx-auto text-center space-y-4">
-          <Loader2 className="w-10 h-10 text-[#FFB830] mx-auto animate-spin" />
+        <div className="border-4 border-ink p-10 max-w-sm mx-auto text-center space-y-5">
+          <Loader2 className="w-10 h-10 text-ink mx-auto animate-spin" strokeWidth={3} />
           <div>
-            <p className="mission-label mb-1">Accessing Archives</p>
-            <h1 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase">
-              Loading Archive
-            </h1>
+            <p className="type-label text-sm text-text-muted mb-2">Archive</p>
+            <h1 className="type-display text-2xl leading-none">Loading archive…</h1>
           </div>
         </div>
       </GameLayout>
@@ -89,24 +87,20 @@ const DailyChallengeArchive: React.FC = () => {
         description="Browse and replay every past Real-or-AI daily challenge. See if you can still spot the AI-generated photo."
         path="/daily/archive"
       />
-      <div className="flex flex-col items-center gap-6 w-full">
+      <div className="flex flex-col items-center gap-8 w-full">
         {/* Header */}
-        <div className="text-center w-full">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Calendar className="w-5 h-5 text-[#FFB830]" />
-            <p className="mission-label">Archive</p>
+        <div className="w-full border-b-4 border-ink pb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Calendar className="w-5 h-5 text-ink" strokeWidth={2.5} />
+            <p className="type-label text-sm">Archive</p>
           </div>
-          <h1 className="font-orbitron text-2xl font-bold text-[#F5F0E8] uppercase tracking-wide">
-            Past Missions
-          </h1>
-          <p className="text-[#8B97C8] text-sm mt-1">Browse and replay past challenges</p>
+          <h1 className="type-display text-4xl md:text-5xl leading-[0.95]">Past challenges.</h1>
+          <p className="font-medium text-text-muted mt-2">Browse and replay past challenges.</p>
         </div>
 
         {entries.length === 0 ? (
-          <div className="corner-bracket bg-[#111840] border border-[#2A3468] p-8 w-full text-center">
-            <p className="text-[#8B97C8] font-space-mono text-sm">
-              // No challenges available yet.
-            </p>
+          <div className="border-4 border-ink p-8 w-full text-center">
+            <p className="font-medium text-text-muted">No challenges available yet.</p>
           </div>
         ) : (
           <motion.div
@@ -145,23 +139,25 @@ const DailyChallengeArchive: React.FC = () => {
                   {completed ? (
                     /* --- Completed card --- */
                     <div
-                      className={`bg-[#111840] border h-full flex flex-col cursor-pointer hover:border-[#FFB830]/60 transition-colors ${
-                        isToday ? 'border-[#FFB830]/50' : 'border-[#2A3468]'
-                      }`}
+                      className="bg-paper border-4 border-ink h-full flex flex-col cursor-pointer hover:border-side-b transition-colors"
                       onClick={() => navigate(isToday ? '/daily' : `/daily/${entry.date}`)}
                     >
                       {/* Thumbnail strip */}
                       {thumbnails.length > 0 && (
-                        <div className="grid grid-cols-3 h-28 overflow-hidden">
+                        <div className="grid grid-cols-3 h-28 overflow-hidden border-b-4 border-ink">
                           {thumbnails.map((url, i) => (
                             <div key={i} className="relative overflow-hidden">
                               <img src={url} alt="" className="w-full h-full object-cover" />
                               {/* per-thumb result indicator */}
-                              <div className="absolute bottom-1 right-1">
+                              <div
+                                className={`absolute bottom-0 right-0 w-6 h-6 flex items-center justify-center ${
+                                  roundDetails[i].correct ? 'bg-side-a text-ink' : 'bg-ink text-paper'
+                                }`}
+                              >
                                 {roundDetails[i].correct ? (
-                                  <CheckCircle2 className="w-4 h-4 text-[#00FFE5] drop-shadow" />
+                                  <Check className="w-4 h-4" strokeWidth={3} />
                                 ) : (
-                                  <XCircle className="w-4 h-4 text-[#FF3D1A] drop-shadow" />
+                                  <X className="w-4 h-4" strokeWidth={3} />
                                 )}
                               </div>
                             </div>
@@ -170,17 +166,13 @@ const DailyChallengeArchive: React.FC = () => {
                       )}
 
                       {/* Card body */}
-                      <div className="p-4 flex flex-col gap-3 flex-1">
+                      <div className="p-4 flex flex-col gap-4 flex-1">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="font-orbitron text-sm font-bold text-[#F5F0E8] uppercase tracking-wide leading-tight">
-                              {displayDate}
-                            </p>
-                            <p className="font-space-mono text-xs text-[#8B97C8] mt-0.5">
-                              {entry.date}
-                            </p>
+                            <p className="type-display text-base leading-tight">{displayDate}</p>
+                            <p className="type-label text-xs text-text-muted mt-1">{entry.date}</p>
                           </div>
-                          <Trophy className="w-4 h-4 text-[#FFB830] shrink-0 mt-0.5" />
+                          <Trophy className="w-5 h-5 text-ink shrink-0" strokeWidth={2.5} />
                         </div>
 
                         {/* Per-round indicators */}
@@ -188,68 +180,61 @@ const DailyChallengeArchive: React.FC = () => {
                           {roundDetails.map((rd, i) => (
                             <div
                               key={i}
-                              className={`w-5 h-5 flex items-center justify-center text-xs font-bold font-space-mono ${
-                                rd.correct
-                                  ? 'bg-[#00FFE5]/20 text-[#00FFE5] border border-[#00FFE5]/40'
-                                  : 'bg-[#FF3D1A]/20 text-[#FF3D1A] border border-[#FF3D1A]/40'
+                              className={`w-6 h-6 flex items-center justify-center ${
+                                rd.correct ? 'bg-side-a text-ink' : 'bg-ink text-paper'
                               }`}
                             >
-                              {rd.correct ? '✓' : '✗'}
+                              {rd.correct ? (
+                                <Check className="w-4 h-4" strokeWidth={3} />
+                              ) : (
+                                <X className="w-4 h-4" strokeWidth={3} />
+                              )}
                             </div>
                           ))}
                         </div>
 
-                        <div className="flex items-center justify-between mt-auto">
-                          <span className="font-space-mono text-sm font-bold text-[#FFB830]">
+                        <div className="flex items-center justify-between flex-wrap gap-3 mt-auto">
+                          <span className="type-label text-sm">
                             {correctCount}/{totalRounds} correct
                           </span>
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            className="text-xs h-7 px-3"
                             onClick={(e) => {
                               e.stopPropagation()
                               navigate(isToday ? '/daily' : `/daily/${entry.date}`)
                             }}
                           >
-                            View Recap
+                            View recap
                           </Button>
                         </div>
                       </div>
                     </div>
                   ) : (
                     /* --- Unplayed card --- */
-                    <div
-                      className={`bg-[#111840] border h-full flex flex-col ${
-                        isToday ? 'border-[#FF6B1A]/60' : 'border-[#2A3468]'
-                      }`}
-                    >
+                    <div className="bg-paper border-4 border-ink h-full flex flex-col">
                       {/* Placeholder area */}
-                      <div className="h-28 bg-[#0B0F2E] flex items-center justify-center border-b border-[#2A3468]">
+                      <div className="h-28 bg-muted flex items-center justify-center border-b-4 border-ink">
                         <div className="text-center space-y-1">
-                          <Calendar className="w-8 h-8 text-[#2A3468] mx-auto" />
-                          <p className="font-space-mono text-xs text-[#2A3468]">Not played</p>
+                          <Calendar
+                            className="w-8 h-8 text-text-placeholder mx-auto"
+                            strokeWidth={2.5}
+                          />
+                          <p className="type-label text-xs text-text-muted">Not played</p>
                         </div>
                       </div>
 
                       {/* Card body */}
-                      <div className="p-4 flex flex-col gap-3 flex-1">
+                      <div className="p-4 flex flex-col gap-4 flex-1">
                         <div>
-                          <p className="font-orbitron text-sm font-bold text-[#F5F0E8] uppercase tracking-wide leading-tight">
-                            {displayDate}
-                          </p>
-                          <p className="font-space-mono text-xs text-[#8B97C8] mt-0.5">
-                            {entry.date}
-                          </p>
+                          <p className="type-display text-base leading-tight">{displayDate}</p>
+                          <p className="type-label text-xs text-text-muted mt-1">{entry.date}</p>
                         </div>
 
                         {isToday && (
-                          <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#FF6B1A] animate-pulse" />
-                            <span className="font-space-mono text-xs text-[#FF6B1A]">
-                              Active Today
-                            </span>
-                          </div>
+                          <span className="self-start type-label text-xs bg-side-a text-ink px-2 py-1">
+                            Active today
+                          </span>
                         )}
 
                         <div className="mt-auto">
@@ -258,8 +243,8 @@ const DailyChallengeArchive: React.FC = () => {
                             className="w-full"
                             onClick={() => navigate(isToday ? '/daily' : `/daily/${entry.date}`)}
                           >
-                            <Play className="w-3.5 h-3.5 mr-1.5" />
-                            {isToday ? 'Play Now' : 'Start Challenge'}
+                            <Play className="w-4 h-4" strokeWidth={3} />
+                            {isToday ? 'Play now' : 'Start challenge'}
                           </Button>
                         </div>
                       </div>
@@ -271,8 +256,8 @@ const DailyChallengeArchive: React.FC = () => {
           </motion.div>
         )}
 
-        <Button variant="outline" onClick={() => navigate('/')}>
-          <Home className="w-4 h-4 mr-2" />
+        <Button variant="ghost" onClick={() => navigate('/')}>
+          <Home className="w-5 h-5" strokeWidth={3} />
           Home
         </Button>
       </div>
