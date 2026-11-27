@@ -2,7 +2,9 @@
 
 The admin dashboard creates a draft in Supabase and calls a separate n8n worker. The worker acknowledges the request immediately, sends the source photo to OpenAI as a reference and uploads the 1024×1024 JPEG to private storage. The admin can review, regenerate, skip or approve the draft. Approval adds the pair to the game library, where it becomes eligible for automatic daily challenges. You can also assign pairs to specific dates in **Daily Challenges**.
 
-Apply [the daily challenge migration](../supabase/migrations/20261126090100_daily_challenges.sql) before deploying the schedule API. The first schedule request imports the existing `challenges/schedule.json` from Storage. On the first player request for an unscheduled day, the API saves one complete pair that has never been used or reserved for another date. If no unused pair is available, the game retries on a later request.
+The schedule lives in `real_vs_ai_daily_challenges` ([table](../supabase/migrations/20261126090100_daily_challenges.sql), [current function](../supabase/migrations/20261127090000_daily_schedule_cleanup.sql)). On the first player request for an unscheduled day, the API saves one complete pair that has never been used or reserved for another date. If no unused pair is available, the game retries on a later request. **Daily Challenges** in `/admin` shows how many unused pairs are left.
+
+The archive at `/daily/archive` lists every scheduled day up to today, grouped by month. Days nobody opened have no challenge and don't appear. Players never receive days scheduled ahead of time. Deleting a past day removes it from the archive and keeps its pair out of the pool. To put a pair back in the pool, delete the row with SQL instead.
 
 ## Set up the worker and app
 

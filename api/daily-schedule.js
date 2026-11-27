@@ -14,6 +14,13 @@ function isDate(value) {
     date.toISOString().slice(0, 10) === value
 }
 
+// Players only see days that have started somewhere in the world (UTC+14 at most).
+// Days scheduled ahead of time stay hidden until then.
+function publicSchedule(schedule) {
+  const latestToday = new Date(Date.now() + 14 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  return Object.fromEntries(Object.entries(schedule).filter(([day]) => day <= latestToday))
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -22,10 +29,16 @@ export default async function handler(req, res) {
   if (!supabase) return res.status(500).json({ error: 'Daily schedule is unavailable' })
 
   let args
+  let adminRead = false
   if (req.method === 'GET') {
-    const today = new URL(req.url, 'http://localhost').searchParams.get('today')
+    const params = new URL(req.url, 'http://localhost').searchParams
+    const today = params.get('today')
     if (today !== null && !isDate(today)) {
       return res.status(400).json({ error: 'Invalid date' })
+    }
+    if (params.has('admin')) {
+      if (!(await hasAdminSession(req))) return res.status(403).json({ error: 'Admins only' })
+      adminRead = true
     }
     args = today ? { p_action: 'fill', p_day: today } : { p_action: 'read' }
   } else {
@@ -40,18 +53,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    let result = await supabase.rpc('real_vs_ai_daily_schedule', args)
-    if (!result.error && result.data === null) {
-      // The database saw a legacy schedule. Import it before drawing any pairs.
-      const { data, error } = await supabase.storage.from('real-vs-ai').download('challenges/schedule.json')
-      if (error) throw error
-      const legacy = JSON.parse(await data.text())
-      result = await supabase.rpc('real_vs_ai_daily_schedule', { ...args, p_legacy: legacy })
-    }
+    const result = await supabase.rpc('real_vs_ai_daily_schedule', args)
     if (result.error?.code === 'PT400') return res.status(400).json({ error: result.error.message })
     if (result.error?.code === 'PT409') return res.status(409).json({ error: result.error.message })
-    if (result.error || result.data === null) throw result.error ?? new Error('Could not import schedule')
-    return res.status(200).json(result.data)
+    if (result.error) throw result.error
+
+    if (adminRead) {
+      const pool = await supabase.rpc('real_vs_ai_daily_schedule', { p_action: 'pool' })
+      if (pool.error) throw pool.error
+      return res.status(200).json({ schedule: result.data, remaining: pool.data.remaining })
+    }
+    if (req.method === 'POST') return res.status(200).json(result.data)
+    return res.status(200).json(publicSchedule(result.data))
   } catch (error) {
     console.error('daily-schedule:', error)
     return res.status(500).json({ error: 'Daily schedule is unavailable' })

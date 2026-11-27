@@ -16,7 +16,12 @@ import ImagePairStudio from '@/components/ImagePairStudio'
 import { useAuth, useUser } from '@clerk/react'
 import { supabase } from '@/lib/supabase'
 import { adminUpload, adminRemove } from '@/lib/adminStorage'
-import { fetchSchedule, saveChallenge, getTodayDate, type DailySchedule } from '@/lib/dailyChallenge'
+import {
+  fetchAdminSchedule,
+  saveChallenge,
+  getTodayDate,
+  type DailySchedule,
+} from '@/lib/dailyChallenge'
 import {
   Loader2,
   Trash2,
@@ -55,6 +60,7 @@ const AdminView: React.FC = () => {
   const [saving, setSaving] = useState(false)
   const [scheduleSaved, setScheduleSaved] = useState(false)
   const [scheduleError, setScheduleError] = useState('')
+  const [remainingPairs, setRemainingPairs] = useState<number | null>(null)
 
   // List State
   const [images, setImages] = useState<ImagePair[]>([])
@@ -104,16 +110,16 @@ const AdminView: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    fetchSchedule().then((s) => {
-      if (s) {
-        setSchedule(s)
-        setSelectedImages(s[getTodayDate()]?.images ?? [])
-      } else {
-        setScheduleError('Could not load the schedule. Refresh to try again.')
-      }
-      setScheduleLoading(false)
-    })
-  }, [])
+    if (!isAdmin) return
+    fetchAdminSchedule(getToken)
+      .then(({ schedule, remaining }) => {
+        setSchedule(schedule)
+        setRemainingPairs(remaining)
+        setSelectedImages(schedule[getTodayDate()]?.images ?? [])
+      })
+      .catch(() => setScheduleError('Could not load the schedule. Refresh to try again.'))
+      .finally(() => setScheduleLoading(false))
+  }, [isAdmin, getToken])
 
   const handleEditChallenge = (date: string) => {
     setSelectedDate(date)
@@ -123,9 +129,7 @@ const AdminView: React.FC = () => {
   }
 
   const toggleImageSelection = (filename: string) => {
-    setSelectedImages((prev) =>
-      prev.length === 1 && prev[0] === filename ? [] : [filename],
-    )
+    setSelectedImages((prev) => (prev.length === 1 && prev[0] === filename ? [] : [filename]))
   }
 
   const updateChallenge = async (date: string, images: string[] | null) => {
@@ -136,6 +140,9 @@ const AdminView: React.FC = () => {
       setSchedule(await saveChallenge(date, images, getToken))
       setSelectedImages(images ?? [])
       setScheduleSaved(images !== null)
+      fetchAdminSchedule(getToken)
+        .then(({ remaining }) => setRemainingPairs(remaining))
+        .catch(() => {})
     } catch (error) {
       setScheduleError(error instanceof Error ? error.message : 'Could not update the schedule.')
     } finally {
@@ -298,9 +305,7 @@ const AdminView: React.FC = () => {
             <button
               onClick={() => setActiveTab('images')}
               className={`flex items-center gap-2 px-4 py-2.5 type-label text-sm transition-colors cursor-pointer ${
-                activeTab === 'images'
-                  ? 'bg-ink text-paper'
-                  : 'text-ink hover:bg-muted'
+                activeTab === 'images' ? 'bg-ink text-paper' : 'text-ink hover:bg-muted'
               }`}
             >
               <ImageIcon className="w-4 h-4" />
@@ -309,9 +314,7 @@ const AdminView: React.FC = () => {
             <button
               onClick={() => setActiveTab('daily')}
               className={`flex items-center gap-2 px-4 py-2.5 type-label text-sm transition-colors cursor-pointer ${
-                activeTab === 'daily'
-                  ? 'bg-ink text-paper'
-                  : 'text-ink hover:bg-muted'
+                activeTab === 'daily' ? 'bg-ink text-paper' : 'text-ink hover:bg-muted'
               }`}
             >
               <Calendar className="w-4 h-4" />
@@ -319,7 +322,9 @@ const AdminView: React.FC = () => {
             </button>
           </div>
 
-          {activeTab === 'drafts' && <ImagePairStudio getToken={getToken} onPublished={fetchImages} />}
+          {activeTab === 'drafts' && (
+            <ImagePairStudio getToken={getToken} onPublished={fetchImages} />
+          )}
 
           {activeTab === 'images' && (
             <div>
@@ -421,7 +426,10 @@ const AdminView: React.FC = () => {
                                             <Loader2 className="w-5 h-5 animate-spin text-paper" />
                                           ) : (
                                             <>
-                                              <Upload className="w-5 h-5 text-paper" strokeWidth={2.5} />
+                                              <Upload
+                                                className="w-5 h-5 text-paper"
+                                                strokeWidth={2.5}
+                                              />
                                               <span className="type-label text-xs text-paper">
                                                 Missing
                                               </span>
@@ -457,6 +465,14 @@ const AdminView: React.FC = () => {
                 <Calendar className="w-5 h-5" />
                 Daily Challenges
               </h2>
+              {remainingPairs !== null && (
+                <p
+                  className={`type-label text-sm mb-4 w-fit ${remainingPairs < 14 ? 'bg-ink text-paper px-2 py-1' : 'text-text-muted'}`}
+                >
+                  {remainingPairs} unused {remainingPairs === 1 ? 'pair' : 'pairs'} left
+                  {remainingPairs < 14 && ' · add more pairs before the daily challenge runs out'}
+                </p>
+              )}
 
               {scheduleLoading ? (
                 <div className="flex justify-center py-10">
@@ -470,7 +486,10 @@ const AdminView: React.FC = () => {
                       <CardTitle className="text-lg">
                         {schedule[selectedDate] ? 'Edit Challenge' : 'New Challenge'}
                       </CardTitle>
-                      <CardDescription>Dates fill automatically with one unused pair. Choose a pair here to set it manually.</CardDescription>
+                      <CardDescription>
+                        Dates fill automatically with one unused pair. Choose a pair here to set it
+                        manually.
+                      </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
@@ -683,9 +702,7 @@ const AdminView: React.FC = () => {
                                 >
                                   <span>{day}</span>
                                   {hasChallenge && (
-                                    <span
-                                      className="w-1.5 h-1.5 mt-0.5 bg-side-a"
-                                    />
+                                    <span className="w-1.5 h-1.5 mt-0.5 bg-side-a" />
                                   )}
                                 </button>
                               )
@@ -782,13 +799,13 @@ const AdminView: React.FC = () => {
       <Dialog open={!!selectedPair} onOpenChange={(open) => !open && setSelectedPair(null)}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle className="type-display text-xl pr-12 break-all">{selectedPair?.name}</DialogTitle>
+            <DialogTitle className="type-display text-xl pr-12 break-all">
+              {selectedPair?.name}
+            </DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-6 mt-4">
             <div className="space-y-3">
-              <div className="text-center type-label bg-side-a text-ink py-2">
-                Real Image
-              </div>
+              <div className="text-center type-label bg-side-a text-ink py-2">Real Image</div>
               <div className="relative aspect-square overflow-hidden border-4 border-ink">
                 <img
                   src={selectedPair?.realUrl}
@@ -798,9 +815,7 @@ const AdminView: React.FC = () => {
               </div>
             </div>
             <div className="space-y-3">
-              <div className="text-center type-label bg-ink text-paper py-2">
-                AI Generated
-              </div>
+              <div className="text-center type-label bg-ink text-paper py-2">AI Generated</div>
               <div className="relative aspect-square overflow-hidden border-4 border-ink">
                 <img
                   src={selectedPair?.aiUrl}

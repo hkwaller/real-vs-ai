@@ -55,7 +55,9 @@ export function getTodayDate(): string {
 
 export async function fetchSchedule(today?: string): Promise<DailySchedule | null> {
   try {
-    const url = today ? `/api/daily-schedule?today=${encodeURIComponent(today)}` : '/api/daily-schedule'
+    const url = today
+      ? `/api/daily-schedule?today=${encodeURIComponent(today)}`
+      : '/api/daily-schedule'
     const res = await fetch(url)
     if (!res.ok) return null
     const json = await res.json()
@@ -65,7 +67,29 @@ export async function fetchSchedule(today?: string): Promise<DailySchedule | nul
   }
 }
 
-export async function saveChallenge(date: string, images: string[] | null, getToken: GetToken): Promise<DailySchedule> {
+export type AdminSchedule = {
+  schedule: DailySchedule
+  /** Complete pairs that have never been used or scheduled. */
+  remaining: number
+}
+
+/** Every scheduled day, future ones included, plus how many unused pairs are left. */
+export async function fetchAdminSchedule(getToken: GetToken): Promise<AdminSchedule> {
+  const token = await getToken()
+  if (!token) throw new Error('Sign in again to see the schedule.')
+  const res = await fetch('/api/daily-schedule?admin', {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  const result = await res.json()
+  if (!res.ok) throw new Error(result.error ?? 'Could not load the schedule.')
+  return result as AdminSchedule
+}
+
+export async function saveChallenge(
+  date: string,
+  images: string[] | null,
+  getToken: GetToken,
+): Promise<DailySchedule> {
   const token = await getToken()
   if (!token) throw new Error('Sign in again to edit the schedule.')
   const res = await fetch('/api/daily-schedule', {
@@ -96,6 +120,27 @@ export function getImageUrls(filename: string): { realUrl: string; aiUrl: string
   const realUrl = supabase.storage.from(BUCKET).getPublicUrl(`real/${filename}`).data.publicUrl
   const aiUrl = supabase.storage.from(BUCKET).getPublicUrl(`ai/${filename}`).data.publicUrl
   return { realUrl, aiUrl }
+}
+
+async function listFolder(folder: 'real' | 'ai'): Promise<string[]> {
+  const names: string[] = []
+  const PAGE = 1000
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabase.storage.from(BUCKET).list(folder, { limit: PAGE, offset })
+    if (error || !data) break
+    for (const f of data) {
+      if (!f.name.startsWith('.') && f.name !== '.emptyFolderPlaceholder') names.push(f.name)
+    }
+    if (data.length < PAGE) break
+  }
+  return names
+}
+
+/** Filenames that exist in both real/ and ai/, so a half-uploaded pair never reaches a game. */
+export async function listPairedFilenames(): Promise<string[]> {
+  const [real, ai] = await Promise.all([listFolder('real'), listFolder('ai')])
+  const aiSet = new Set(ai)
+  return real.filter((name) => aiSet.has(name))
 }
 
 export function buildRounds(date: string, images: string[]): DailyRound[] {
