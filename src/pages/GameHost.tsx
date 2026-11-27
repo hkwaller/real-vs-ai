@@ -10,10 +10,32 @@ import {
 } from '@/components/ui/dialog'
 import { ArrowRight, NameBlock, ReplayIcon, Wordmark } from '@/components/Brand'
 import CountdownRing from '@/components/CountdownRing'
+import { getImageUrls } from '@/lib/dailyChallenge'
 import { supabase } from '@/lib/supabase'
 import { Users, UserX, X, Loader2 } from 'lucide-react'
 import { PartyRoomProvider, hostGuestKey, usePartyRoom } from '@/hooks/usePartyRoom'
 import { correctChoiceOf, type RoundData } from '@/lib/partyRoom'
+
+async function listFolder(folder: 'real' | 'ai'): Promise<string[]> {
+  const names: string[] = []
+  const PAGE = 1000
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabase.storage.from('real-vs-ai').list(folder, { limit: PAGE, offset })
+    if (error || !data) break
+    for (const f of data) {
+      if (!f.name.startsWith('.') && f.name !== '.emptyFolderPlaceholder') names.push(f.name)
+    }
+    if (data.length < PAGE) break
+  }
+  return names
+}
+
+/** Filenames present in both real/ and ai/, so a half-uploaded pair never reaches a game. */
+async function listPairedFilenames(): Promise<string[]> {
+  const [real, ai] = await Promise.all([listFolder('real'), listFolder('ai')])
+  const aiSet = new Set(ai)
+  return real.filter((name) => aiSet.has(name))
+}
 
 const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const navigate = useNavigate()
@@ -52,27 +74,18 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   }, [state?.players, state?.scores])
 
   const fetchReplacementImage = async (): Promise<RoundData | null> => {
-    const { data: files } = await supabase.storage.from('real-vs-ai').list('real')
-    if (!files) return null
-
-    const validFiles = files.filter(
-      (f) => !f.name.startsWith('.') && f.name !== '.emptyFolderPlaceholder',
-    )
+    const validFiles = await listPairedFilenames()
+    if (validFiles.length === 0) return null
 
     const usedNames = new Set(
       (roundsStorage ?? []).map((r) => r.realImageUrl.split('/real/').pop() ?? ''),
     )
-    const available = validFiles.filter((f) => !usedNames.has(f.name))
+    const available = validFiles.filter((name) => !usedNames.has(name))
     const pool = available.length > 0 ? available : validFiles
 
-    const file = pool[Math.floor(Math.random() * pool.length)]
-    return {
-      id: crypto.randomUUID(),
-      realImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`real/${file.name}`).data
-        .publicUrl,
-      aiImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`ai/${file.name}`).data
-        .publicUrl,
-    }
+    const name = pool[Math.floor(Math.random() * pool.length)]
+    const { realUrl, aiUrl } = getImageUrls(name)
+    return { id: crypto.randomUUID(), realImageUrl: realUrl, aiImageUrl: aiUrl }
   }
 
   const handleSkipPicture = async () => {
@@ -84,13 +97,9 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   }
 
   const generateRoundsAsync = async (count: number): Promise<RoundData[]> => {
-    const { data: files } = await supabase.storage.from('real-vs-ai').list('real')
+    const validFiles = await listPairedFilenames()
 
-    if (files && files.length > 0) {
-      const validFiles = files.filter(
-        (f) => f.name !== '.emptyFolderPlaceholder' && !f.name.startsWith('.'),
-      )
-
+    if (validFiles.length > 0) {
       const today = new Date().toISOString().split('T')[0]
       const history = JSON.parse(
         localStorage.getItem('real_vs_ai_shown_images') || '{"date": "", "images": []}',
@@ -98,7 +107,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
 
       let availableFiles = validFiles
       if (history.date === today) {
-        availableFiles = validFiles.filter((f) => !history.images.includes(f.name))
+        availableFiles = validFiles.filter((name) => !history.images.includes(name))
       }
 
       if (availableFiles.length < count) {
@@ -113,16 +122,13 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
 
       let hist = history
       if (hist.date !== today) hist = { date: today, images: [] }
-      hist.images = [...new Set([...hist.images, ...selected.map((f) => f.name)])]
+      hist.images = [...new Set([...hist.images, ...selected])]
       localStorage.setItem('real_vs_ai_shown_images', JSON.stringify(hist))
 
-      return selected.map((file) => ({
-        id: crypto.randomUUID(),
-        realImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`real/${file.name}`).data
-          .publicUrl,
-        aiImageUrl: supabase.storage.from('real-vs-ai').getPublicUrl(`ai/${file.name}`).data
-          .publicUrl,
-      }))
+      return selected.map((name) => {
+        const { realUrl, aiUrl } = getImageUrls(name)
+        return { id: crypto.randomUUID(), realImageUrl: realUrl, aiImageUrl: aiUrl }
+      })
     }
     return Array.from({ length: count }).map((_, i) => ({
       id: crypto.randomUUID(),
@@ -440,10 +446,10 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
   const fieldA = revealed && !aWins ? 'bg-side-a-tint' : 'bg-side-a'
   const fieldB = revealed && aWins ? 'bg-side-b-deep' : 'bg-side-b'
   const fieldPad = 'px-[clamp(20px,3.5vw,56px)] pt-[clamp(20px,2.5vw,40px)] pb-[clamp(16px,2vw,32px)]'
-  const verdictSize = 'text-[clamp(48px,6.5vw,104px)] leading-[0.9] tracking-[-0.03em]'
-  const loserSize = 'text-[clamp(32px,3.5vw,56px)] leading-[0.95]'
-  const headlineSize = 'text-[clamp(40px,4.75vw,76px)] leading-[0.95] tracking-[-0.02em]'
-  const letterSize = 'text-[clamp(90px,9.4vw,150px)] leading-[0.78]'
+  const verdictSize = 'text-[clamp(26px,8vw,48px)] md:text-[clamp(48px,6.5vw,104px)] leading-[0.9] tracking-[-0.03em]'
+  const loserSize = 'text-[clamp(18px,5vw,32px)] md:text-[clamp(32px,3.5vw,56px)] leading-[0.95]'
+  const headlineSize = 'text-[clamp(24px,7vw,40px)] md:text-[clamp(40px,4.75vw,76px)] leading-[0.95] tracking-[-0.02em]'
+  const letterSize = 'text-[clamp(48px,14vw,90px)] md:text-[clamp(90px,9.4vw,150px)] leading-[0.78]'
 
   const voteMeta = (side: 'A' | 'B') => {
     const n = Object.values(votes).filter((v) => v === side).length
@@ -481,8 +487,8 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
           style={{ flexGrow: growA, flexBasis: 0 }}
         >
           <div className="w-full flex justify-between type-label text-[clamp(14px,1.3vw,20px)]">
-            <Wordmark className="text-[clamp(14px,1.3vw,20px)] tracking-[0.02em]" />
-            <span>
+            <Wordmark className="max-sm:hidden text-[clamp(14px,1.3vw,20px)] tracking-[0.02em]" />
+            <span className="ml-auto text-right">
               Round {currentRoundIndex + 1}/{totalRounds}
               {revealed ? ' · The verdict' : ''}
             </span>
@@ -502,7 +508,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
               className={`max-h-full max-w-full object-contain transition-opacity duration-500 ${revealed && !aWins ? 'opacity-60' : ''}`}
             />
           </div>
-          <div className="w-full flex items-end justify-between gap-4">
+          <div className="w-full flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
             <div className="flex flex-col gap-2 min-w-0">
               <span className="type-label text-[clamp(14px,1.3vw,20px)]">{voteMeta('A')}</span>
               <VoterRow side="A" onBlue={false} />
@@ -522,7 +528,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
             <span>
               {revealed ? `${correctCount} of ${totalPlayers} got it` : `${votedCount} of ${totalPlayers} voted`}
             </span>
-            <span>{liveVotesVisible ? 'Live votes' : 'Votes after the round'}</span>
+            <span className="max-sm:hidden">{liveVotesVisible ? 'Live votes' : 'Votes after the round'}</span>
           </div>
           <span
             aria-hidden={!revealed}
@@ -537,7 +543,7 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
               className={`max-h-full max-w-full object-contain transition-opacity duration-500 ${revealed && aWins ? 'opacity-60' : ''}`}
             />
           </div>
-          <div className="w-full flex items-end justify-between gap-4">
+          <div className="w-full flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
             <span className={`type-display ${letterSize}`} aria-hidden="true">
               B
             </span>
@@ -563,12 +569,12 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
       <footer className="h-[112px] shrink-0 bg-ink text-paper flex items-center on-dark">
         {revealed ? (
           <>
-            <ol className="flex-1 grid grid-cols-3 lg:grid-cols-5 gap-4 px-[clamp(20px,3.5vw,56px)] min-w-0">
+            <ol className="flex-1 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 px-[clamp(16px,3.5vw,56px)] min-w-0">
               {players.slice(0, 5).map((p, i) => (
-                <li key={p.id} className={`flex items-baseline gap-3.5 min-w-0 ${i > 2 ? 'max-lg:hidden' : ''}`}>
+                <li key={p.id} className={`flex items-baseline gap-3.5 min-w-0 ${i > 2 ? 'max-lg:hidden' : ''} ${i > 0 ? 'max-sm:hidden' : ''}`}>
                   <span className={`type-display text-[34px] leading-none ${i === 0 ? 'text-side-a' : ''}`}>{i + 1}</span>
                   <span className="flex flex-col gap-0.5 min-w-0">
-                    <span className="type-name text-2xl leading-none truncate">{p.name}</span>
+                    <span className="type-name text-lg sm:text-2xl leading-none truncate">{p.name}</span>
                     <span className="font-semibold text-base text-on-ink-muted tabular-nums">{p.score} pts</span>
                   </span>
                 </li>
@@ -579,14 +585,14 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                 {bossName} can move on too
               </span>
             )}
-            <Button className="h-[112px] px-11 text-[clamp(22px,2vw,30px)]" onClick={nextRound}>
+            <Button className="h-[112px] px-6 sm:px-11 text-[clamp(20px,2vw,30px)]" onClick={nextRound}>
               {currentRoundIndex + 1 >= totalRounds ? 'See results' : 'Next round'} <ArrowRight />
             </Button>
           </>
         ) : (
           <>
-            <div className="flex-1 flex items-center gap-6 px-[clamp(20px,3.5vw,56px)] min-w-0">
-              <div className="flex gap-1.5" aria-label={`Round ${currentRoundIndex + 1} of ${totalRounds}`}>
+            <div className="flex-1 flex items-center gap-6 px-[clamp(16px,3.5vw,56px)] min-w-0">
+              <div className="max-sm:hidden flex gap-1.5" aria-label={`Round ${currentRoundIndex + 1} of ${totalRounds}`}>
                 {Array.from({ length: totalRounds }).map((_, idx) => (
                   <span
                     key={idx}
@@ -600,11 +606,11 @@ const GameHostContent: React.FC<{ code: string }> = ({ code }) => {
                   />
                 ))}
               </div>
-              <span className="type-label text-[clamp(14px,1.3vw,20px)] truncate">
+              <span className={`type-label text-[clamp(14px,1.3vw,20px)] truncate ${bossName ? '' : 'max-sm:hidden'}`}>
                 {bossName ? `${bossName} is the boss` : 'Space reveals early'}
               </span>
             </div>
-            <div className="flex items-center gap-3 pr-[clamp(20px,3.5vw,56px)]">
+            <div className="flex items-center gap-3 shrink-0 pr-[clamp(16px,3.5vw,56px)]">
               {ManagePlayers}
               <Button variant="outline" className="text-paper h-12 text-base px-4" onClick={handleSkipPicture} disabled={isReplacing}>
                 {isReplacing ? <Loader2 className="animate-spin" /> : <ReplayIcon />}

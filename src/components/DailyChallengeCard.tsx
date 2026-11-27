@@ -107,7 +107,7 @@ const DailyChallengeCard: React.FC = () => {
         ) : (
           <>
             <Button
-              className="h-[72px] px-7 text-2xl"
+              className="w-full sm:w-auto h-16 sm:h-[72px] px-5 sm:px-7 gap-2 sm:gap-3 text-base sm:text-2xl justify-between sm:justify-center"
               onClick={() => navigate('/daily')}
               disabled={status === 'loading'}
             >

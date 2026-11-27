@@ -71,7 +71,7 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
   }`;
 
   return (
-    <main className="min-h-dvh lg:h-dvh grid grid-rows-[auto_auto] lg:grid-rows-[minmax(0,1.5fr)_minmax(0,1fr)] bg-paper text-ink overflow-hidden">
+    <main className="min-h-dvh lg:h-dvh grid grid-rows-[auto_auto] lg:grid-rows-[minmax(0,1.5fr)_minmax(0,1fr)] bg-paper text-ink overflow-x-clip lg:overflow-hidden">
       {/* Orange: how to join */}
       <section className="bg-side-a text-ink px-4 md:px-14 pt-8 pb-10 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-8 md:gap-12 min-h-0">
         <div className="flex flex-col justify-between gap-8 min-w-0">
@@ -86,7 +86,7 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
           </div>
           <div className="flex flex-col gap-2">
             <span className="type-label text-[clamp(14px,1.3vw,20px)]">Party code</span>
-            <span className="type-display text-[clamp(110px,17vw,290px)] leading-[0.76] tracking-[-0.02em]">
+            <span className="type-display text-[18vw] md:text-[clamp(110px,17vw,290px)] leading-[0.76] tracking-[-0.02em]">
               {code}
             </span>
           </div>
@@ -109,7 +109,7 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
       </section>
 
       {/* Blue: who's in */}
-      <section className="bg-side-b text-paper px-4 md:px-14 pt-8 pb-8 flex flex-col gap-6 min-h-0">
+      <section className="bg-side-b text-paper px-4 md:px-14 pt-8 pb-40 lg:pb-8 flex flex-col gap-6 min-h-0">
         <div className="flex items-baseline gap-6">
           <h2 className="type-display text-[clamp(32px,3vw,48px)] leading-none">Who's in</h2>
           <span className="type-display text-[clamp(32px,3vw,48px)] leading-none text-side-a">
@@ -161,10 +161,11 @@ const LobbyContent: React.FC<{ code: string; settings: GameSettings }> = ({ code
             </p>
           </div>
 
-          <div className="flex flex-col items-stretch lg:items-end gap-2 shrink-0">
+          {/* Below lg the page scrolls, so Start stays pinned to the bottom of the screen. */}
+          <div className="max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-10 max-lg:bg-side-b max-lg:px-4 md:max-lg:px-14 max-lg:pt-3 max-lg:pb-[max(16px,env(safe-area-inset-bottom))] flex flex-col items-stretch lg:items-end gap-2 shrink-0">
             <Button
               size="xl"
-              className="h-24 px-11 text-[clamp(26px,2.2vw,34px)]"
+              className="h-20 lg:h-24 px-11 text-[clamp(26px,2.2vw,34px)]"
               onClick={handleStart}
               disabled={players.length === 0 || !isReady}
             >
