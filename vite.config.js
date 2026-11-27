@@ -95,37 +95,60 @@ function staticSeo() {
   }
 }
 
-// `npm run dev` has no Vercel functions, so serve /api/party-auth (the room
-// ticket route) from Vite itself. `vercel dev` routes /api before this runs.
-function partyAuthDev(env) {
+// Serve the local game and admin API handlers when running Vite directly.
+function localApiDev(env) {
+  const routes = new Set(['/api/party-auth', '/api/admin-storage', '/api/admin-image-pairs', '/api/daily-schedule'])
+  const envKeys = [
+    'PARTY_SECRET',
+    'CLERK_SECRET_KEY',
+    'SUPABASE_URL',
+    'VITE_SUPABASE_URL',
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'IMAGE_PAIR_N8N_WEBHOOK_URL',
+    'IMAGE_PAIR_N8N_WEBHOOK_SECRET',
+    'UNSPLASH_ACCESS_KEY',
+    'UNSPLASH_PAIR_IMPORT_ENABLED',
+  ]
   return {
-    name: 'party-auth-dev',
+    name: 'local-api-dev',
     apply: 'serve',
     configureServer(server) {
-      if (env.PARTY_SECRET && !process.env.PARTY_SECRET) process.env.PARTY_SECRET = env.PARTY_SECRET
-      server.middlewares.use('/api/party-auth', async (req, res) => {
-        const chunks = []
-        for await (const chunk of req) chunks.push(chunk)
-        let body = null
-        try {
-          body = JSON.parse(Buffer.concat(chunks).toString() || 'null')
-        } catch {
-          /* handler rejects a missing body */
-        }
-        const { default: handler } = await server.ssrLoadModule('/api/party-auth.js')
+      for (const key of envKeys) {
+        if (process.env[key] === undefined && env[key] !== undefined) process.env[key] = env[key]
+      }
+      server.middlewares.use((req, res, next) => {
+        const route = req.url?.split('?')[0]
+        if (!routes.has(route)) return next()
+
         const reply = {
           status(code) {
             res.statusCode = code
             return reply
           },
-          setHeader: (k, v) => res.setHeader(k, v),
+          setHeader: (key, value) => res.setHeader(key, value),
           json(value) {
-            res.setHeader('content-type', 'application/json')
+            res.setHeader('Content-Type', 'application/json')
             res.end(JSON.stringify(value))
             return reply
           },
         }
-        await handler(Object.assign(req, { body }), reply)
+
+        async function handle() {
+          const chunks = []
+          for await (const chunk of req) chunks.push(chunk)
+          let body = null
+          if (chunks.length > 0) {
+            try {
+              body = JSON.parse(Buffer.concat(chunks).toString())
+            } catch {
+              return reply.status(400).json({ error: 'Invalid JSON body' })
+            }
+          }
+          const { default: handler } = await server.ssrLoadModule(`${route}.js`)
+          return handler(Object.assign(req, { body }), reply)
+        }
+
+        handle().catch(next)
       })
     },
   }
@@ -133,7 +156,7 @@ function partyAuthDev(env) {
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), staticSeo(), partyAuthDev(loadEnv(mode, process.cwd(), ''))],
+  plugins: [react(), staticSeo(), localApiDev(loadEnv(mode, process.cwd(), ''))],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

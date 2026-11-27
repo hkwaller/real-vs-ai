@@ -30,12 +30,12 @@ const DailyChallengeArchive: React.FC = () => {
 
   useEffect(() => {
     async function load() {
+      const today = getTodayDate()
       const [schedule, scores]: [DailySchedule | null, DailyScores] = await Promise.all([
-        fetchSchedule(),
+        fetchSchedule(today),
         Promise.resolve(getDailyScores()),
       ])
 
-      const today = getTodayDate()
       const allDates = new Set<string>([...Object.keys(schedule ?? {}), ...Object.keys(scores)])
 
       const sorted = Array.from(allDates).sort((a, b) => b.localeCompare(a))
@@ -47,7 +47,7 @@ const DailyChallengeArchive: React.FC = () => {
           date,
           available: inSchedule || !!dayScore,
           score: dayScore?.score,
-          maxScore: dayScore?.maxScore ?? (schedule?.[date]?.images.length ?? 5) * 100,
+          maxScore: dayScore?.maxScore ?? (schedule?.[date]?.images.length ?? 1) * 100,
           roundDetails: dayScore?.roundDetails,
           completedAt: dayScore?.completedAt,
         }

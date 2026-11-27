@@ -86,7 +86,7 @@ const DailyChallenge: React.FC = () => {
         setPhase('already_done')
         return
       }
-      const schedule = await fetchSchedule()
+      const schedule = await fetchSchedule(isToday ? date : undefined)
       if (!schedule || !schedule[date]) {
         setPhase('no_challenge')
         return
@@ -95,7 +95,7 @@ const DailyChallenge: React.FC = () => {
       setPhase('playing')
     }
     load()
-  }, [date])
+  }, [date, isToday])
 
   useEffect(() => {
     if ((phase !== 'already_done' && phase !== 'finished') || !isToday) return
@@ -166,7 +166,7 @@ const DailyChallenge: React.FC = () => {
     const details = existingScore?.roundDetails ?? []
     const correct = details.filter((r) => r.correct).length
     const grid = details.map((r) => (r.correct ? '🟩' : '🟥')).join('')
-    const text = `Real vs AI - Today's five\n${correct}/${details.length} ${grid}\nCan you beat me? 🤖`
+    const text = `Real vs AI - Daily challenge\n${correct}/${details.length} ${grid}\nCan you beat me? 🤖`
     if (navigator.share) navigator.share({ text }).catch(() => {})
     else navigator.clipboard.writeText(text)
   }
@@ -178,7 +178,7 @@ const DailyChallenge: React.FC = () => {
         {seo}
         <div className="border-4 border-ink p-10 max-w-sm mx-auto text-center space-y-5">
           <Loader2 className="w-10 h-10 text-ink mx-auto animate-spin" strokeWidth={3} />
-          <h1 className="type-display text-2xl leading-none">Loading today's five…</h1>
+          <h1 className="type-display text-2xl leading-none">Loading daily challenge…</h1>
         </div>
       </GameLayout>
     )
@@ -198,7 +198,7 @@ const DailyChallenge: React.FC = () => {
             <h1 className="type-display text-4xl leading-[0.95]">No challenge today.</h1>
             <p className="font-medium text-text-muted mt-3">
               {isToday
-                ? 'Check back tomorrow for a fresh five.'
+                ? 'Check back for a new pair.'
                 : `Nothing was scheduled for ${date}.`}
             </p>
           </div>
@@ -239,7 +239,7 @@ const DailyChallenge: React.FC = () => {
           </div>
           <p className="font-semibold text-lg mt-5">
             {correctCount === totalRounds
-              ? 'A perfect five. Incredible eye.'
+              ? totalRounds === 1 ? 'You spotted the real photo.' : 'A perfect score. Incredible eye.'
               : correctCount >= totalRounds / 2
                 ? 'Nice eye - the AI didn’t fool you much today.'
                 : 'The AI got you today. Come back tomorrow.'}
@@ -276,7 +276,7 @@ const DailyChallenge: React.FC = () => {
             </Button>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Button variant="ghost" size="sm" onClick={() => setShowReview((v) => !v)}>
-                Review rounds
+                {totalRounds === 1 ? 'Review the pair' : 'Review rounds'}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
                 Home
@@ -286,7 +286,7 @@ const DailyChallenge: React.FC = () => {
 
           {isToday && (
             <p className="type-label text-sm text-text-muted mt-6">
-              Next five in <span className="text-ink tabular-nums">{countdown}</span>
+              Next challenge in <span className="text-ink tabular-nums">{countdown}</span>
             </p>
           )}
 
@@ -305,7 +305,7 @@ const DailyChallenge: React.FC = () => {
                   return (
                     <div key={rd.roundId} className="border-4 border-ink p-3">
                       <div className="flex items-center justify-between mb-3">
-                        <span className="type-label text-sm">Round {i + 1}</span>
+                        <span className="type-label text-sm">{totalRounds === 1 ? 'Image pair' : `Round ${i + 1}`}</span>
                         <span
                           className={`type-label text-xs px-2 py-1 ${
                             rd.correct ? 'bg-side-a text-ink' : 'bg-ink text-paper'
@@ -370,30 +370,32 @@ const DailyChallenge: React.FC = () => {
       {seo}
       {/* Top strip */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3 border-b-2 border-ink pb-4">
-        <span className="type-label text-sm">Today's five · {prettyDate(date)}</span>
-        <div className="flex items-center gap-2">
-          {squares.map((s, i) => (
-            <div
-              key={i}
-              className={`w-4 h-4 ${
-                s === 'correct'
-                  ? 'bg-side-a'
-                  : s === 'wrong'
-                    ? 'bg-ink'
-                    : s === 'current'
-                      ? 'border-4 border-ink bg-paper'
-                      : 'border-2 border-text-placeholder bg-paper'
-              }`}
-            />
-          ))}
-        </div>
+        <span className="type-label text-sm">Daily challenge · {prettyDate(date)}</span>
+        {rounds.length > 1 && (
+          <div className="flex items-center gap-2">
+            {squares.map((s, i) => (
+              <div
+                key={i}
+                className={`w-4 h-4 ${
+                  s === 'correct'
+                    ? 'bg-side-a'
+                    : s === 'wrong'
+                      ? 'bg-ink'
+                      : s === 'current'
+                        ? 'border-4 border-ink bg-paper'
+                        : 'border-2 border-text-placeholder bg-paper'
+                }`}
+              />
+            ))}
+          </div>
+        )}
         {streak > 0 ? (
           <span className="type-label text-sm">{streak}-day streak</span>
-        ) : (
+        ) : rounds.length > 1 ? (
           <span className="type-label text-sm text-text-muted">
             Round {roundIndex + 1} of {rounds.length}
           </span>
-        )}
+        ) : null}
       </div>
 
       <h1 className="text-center type-display text-[32px] md:text-[44px] leading-none mb-6">

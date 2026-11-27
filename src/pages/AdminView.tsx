@@ -16,7 +16,7 @@ import ImagePairStudio from '@/components/ImagePairStudio'
 import { useAuth, useUser } from '@clerk/react'
 import { supabase } from '@/lib/supabase'
 import { adminUpload, adminRemove } from '@/lib/adminStorage'
-import { fetchSchedule, saveSchedule, getTodayDate, type DailySchedule } from '@/lib/dailyChallenge'
+import { fetchSchedule, saveChallenge, getTodayDate, type DailySchedule } from '@/lib/dailyChallenge'
 import {
   Loader2,
   Trash2,
@@ -53,7 +53,8 @@ const AdminView: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(getTodayDate())
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
-  const [scheduleStatus, setScheduleStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [scheduleSaved, setScheduleSaved] = useState(false)
+  const [scheduleError, setScheduleError] = useState('')
 
   // List State
   const [images, setImages] = useState<ImagePair[]>([])
@@ -104,7 +105,12 @@ const AdminView: React.FC = () => {
 
   useEffect(() => {
     fetchSchedule().then((s) => {
-      setSchedule(s ?? {})
+      if (s) {
+        setSchedule(s)
+        setSelectedImages(s[getTodayDate()]?.images ?? [])
+      } else {
+        setScheduleError('Could not load the schedule. Refresh to try again.')
+      }
       setScheduleLoading(false)
     })
   }, [])
@@ -112,41 +118,34 @@ const AdminView: React.FC = () => {
   const handleEditChallenge = (date: string) => {
     setSelectedDate(date)
     setSelectedImages(schedule[date]?.images ?? [])
-    setScheduleStatus('idle')
+    setScheduleSaved(false)
+    setScheduleError('')
   }
 
   const toggleImageSelection = (filename: string) => {
     setSelectedImages((prev) =>
-      prev.includes(filename) ? prev.filter((f) => f !== filename) : [...prev, filename],
+      prev.length === 1 && prev[0] === filename ? [] : [filename],
     )
   }
 
-  const handleSaveChallenge = async () => {
-    if (selectedImages.length === 0) return
+  const updateChallenge = async (date: string, images: string[] | null) => {
     setSaving(true)
-    setScheduleStatus('idle')
-    const updated = { ...schedule, [selectedDate]: { images: selectedImages } }
-    const ok = await saveSchedule(updated, getToken)
-    if (ok) {
-      setSchedule(updated)
-      setScheduleStatus('success')
-    } else {
-      setScheduleStatus('error')
+    setScheduleSaved(false)
+    setScheduleError('')
+    try {
+      setSchedule(await saveChallenge(date, images, getToken))
+      setSelectedImages(images ?? [])
+      setScheduleSaved(images !== null)
+    } catch (error) {
+      setScheduleError(error instanceof Error ? error.message : 'Could not update the schedule.')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   const handleDeleteChallenge = async (date: string) => {
     if (!confirm(`Delete challenge for ${date}?`)) return
-    const updated = { ...schedule }
-    delete updated[date]
-    const ok = await saveSchedule(updated, getToken)
-    if (ok) {
-      setSchedule(updated)
-      if (selectedDate === date) {
-        setSelectedImages([])
-      }
-    }
+    await updateChallenge(date, null)
   }
 
   const compressImage = (file: File, maxSize = 1024, quality = 0.85): Promise<Blob> =>
@@ -471,7 +470,7 @@ const AdminView: React.FC = () => {
                       <CardTitle className="text-lg">
                         {schedule[selectedDate] ? 'Edit Challenge' : 'New Challenge'}
                       </CardTitle>
-                      <CardDescription>Select images for a specific date</CardDescription>
+                      <CardDescription>Dates fill automatically with one unused pair. Choose a pair here to set it manually.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
@@ -479,17 +478,14 @@ const AdminView: React.FC = () => {
                         <Input
                           type="date"
                           value={selectedDate}
-                          onChange={(e) => {
-                            setSelectedDate(e.target.value)
-                            setSelectedImages(schedule[e.target.value]?.images ?? [])
-                            setScheduleStatus('idle')
-                          }}
+                          disabled={saving}
+                          onChange={(e) => handleEditChallenge(e.target.value)}
                         />
                       </div>
 
                       <div className="space-y-2">
                         <label className="type-label text-sm">
-                          Images{' '}
+                          Image pair{' '}
                           <span
                             className={`text-xs ${selectedImages.length > 0 ? 'text-ink font-semibold' : 'text-muted-foreground'}`}
                           >
@@ -503,7 +499,7 @@ const AdminView: React.FC = () => {
                             {images.map((img) => {
                               const checked = selectedImages.includes(img.name)
                               const usedElsewhere = usedInOtherDays.has(img.name)
-                              const disabled = usedElsewhere && !checked
+                              const disabled = saving || (usedElsewhere && !checked)
                               // Find which date uses this image
                               const usedOnDate = usedElsewhere
                                 ? Object.entries(schedule).find(
@@ -559,14 +555,14 @@ const AdminView: React.FC = () => {
                         )}
                       </div>
 
-                      {scheduleStatus === 'success' && (
+                      {scheduleSaved && (
                         <div className="p-3 border-4 border-ink text-ink font-medium text-xs text-center">
                           Challenge saved!
                         </div>
                       )}
-                      {scheduleStatus === 'error' && (
+                      {scheduleError && (
                         <div className="p-3 bg-ink text-paper font-medium text-xs text-center">
-                          Save failed. Try again.
+                          {scheduleError}
                         </div>
                       )}
                     </CardContent>
@@ -574,8 +570,8 @@ const AdminView: React.FC = () => {
                       <Button
                         variant="default"
                         className="w-full"
-                        onClick={handleSaveChallenge}
-                        disabled={saving || selectedImages.length === 0}
+                        onClick={() => updateChallenge(selectedDate, selectedImages)}
+                        disabled={saving || !selectedDate || selectedImages.length !== 1}
                       >
                         {saving ? (
                           <Loader2 className="h-5 w-5 animate-spin" />
@@ -670,14 +666,8 @@ const AdminView: React.FC = () => {
                               return (
                                 <button
                                   key={i}
-                                  onClick={() => {
-                                    if (hasChallenge) handleEditChallenge(dateStr)
-                                    else {
-                                      setSelectedDate(dateStr)
-                                      setSelectedImages([])
-                                      setScheduleStatus('idle')
-                                    }
-                                  }}
+                                  disabled={saving}
+                                  onClick={() => handleEditChallenge(dateStr)}
                                   title={
                                     hasChallenge
                                       ? `${schedule[dateStr].images.length} images`
@@ -719,6 +709,7 @@ const AdminView: React.FC = () => {
                                 <Button
                                   variant="destructive"
                                   size="sm"
+                                  disabled={saving}
                                   onClick={() => handleDeleteChallenge(selectedDate)}
                                 >
                                   <Trash2 />

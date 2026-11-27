@@ -17,7 +17,7 @@ import PublicLegal from './pages/PublicLegal'
 function ProtectedRoute({ element }: { element: React.ReactElement }) {
   const { isSignedIn, isLoaded } = useAuth()
   if (!isLoaded) return null
-  if (!isSignedIn) return <RedirectToSignIn redirectUrl="/sign-in" />
+  if (!isSignedIn) return <RedirectToSignIn />
   return element
 }
 

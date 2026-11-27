@@ -28,6 +28,7 @@ function computeStreak(): number {
 const DailyChallengeCard: React.FC = () => {
   const navigate = useNavigate()
   const [status, setStatus] = useState<CardStatus>('loading')
+  const [roundCount, setRoundCount] = useState(1)
   const [roundDetails, setRoundDetails] = useState<RoundDetail[]>([])
   const streak = computeStreak()
 
@@ -37,18 +38,21 @@ const DailyChallengeCard: React.FC = () => {
       const scores = getDailyScores()
 
       if (scores[today]) {
+        setRoundCount(scores[today].rounds)
         setRoundDetails(scores[today].roundDetails ?? [])
         setStatus('completed')
         return
       }
 
-      const schedule = await fetchSchedule()
-      setStatus(schedule?.[today] ? 'available' : 'no_challenge')
+      const schedule = await fetchSchedule(today)
+      const roundCount = schedule?.[today]?.images.length
+      if (roundCount) setRoundCount(roundCount)
+      setStatus(roundCount ? 'available' : 'no_challenge')
     }
     check()
   }, [])
 
-  const squares = Array.from({ length: 5 }).map((_, i) => {
+  const squares = Array.from({ length: roundCount }, (_, i) => {
     if (status === 'completed') {
       const rd = roundDetails[i]
       if (!rd) return 'empty'
@@ -62,11 +66,13 @@ const DailyChallengeCard: React.FC = () => {
   return (
     <article className="bg-side-b text-paper on-dark px-4 md:px-14 py-12 md:py-[72px] flex flex-col gap-[22px]">
       <span className="type-label text-base">Daily challenge · {dateLabel}</span>
-      <h2 className="type-display text-[clamp(48px,5vw,80px)] leading-[0.88]">Today's five.</h2>
+      <h2 className="type-display text-[clamp(48px,5vw,80px)] leading-[0.88]">Which one’s real?</h2>
       <p className="font-medium text-[19px] leading-[1.45] text-on-blue-muted max-w-[34ch]">
         {status === 'loading' && 'Loading today’s challenge…'}
-        {status === 'available' && 'Five pairs a day, the same for everyone. Finish before midnight.'}
-        {status === 'completed' && "You've finished today's five. Come back tomorrow for the next."}
+        {status === 'available' && (roundCount === 1
+          ? 'One real photo, one AI image. Everyone plays the same pair.'
+          : 'Everyone plays the same pairs. Finish before midnight.')}
+        {status === 'completed' && 'You’ve finished today’s challenge. Come back tomorrow for a new pair.'}
         {status === 'no_challenge' && 'No challenge today. Check back tomorrow.'}
       </p>
 
@@ -74,9 +80,9 @@ const DailyChallengeCard: React.FC = () => {
         className="flex gap-2"
         role="img"
         aria-label={
-          status === 'completed'
-            ? `${squares.filter((x) => x === 'correct').length} of 5 right`
-            : 'Not played yet'
+          status !== 'completed' ? 'Not played yet' : roundDetails.length
+            ? `${squares.filter((x) => x === 'correct').length} of ${roundCount} right`
+            : 'Challenge completed'
         }
       >
         {squares.map((sq, i) => (
@@ -105,7 +111,7 @@ const DailyChallengeCard: React.FC = () => {
               onClick={() => navigate('/daily')}
               disabled={status === 'loading'}
             >
-              Play today's five <ArrowRight />
+              Play today’s challenge <ArrowRight />
             </Button>
             <button
               type="button"

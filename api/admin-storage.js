@@ -10,7 +10,7 @@ import { createClient } from '@supabase/supabase-js'
 // browser uploads straight to Storage, which avoids Vercel's request body limit.
 
 const BUCKET = 'real-vs-ai'
-const ALLOWED_PATH = /^(?:(?:real|ai)\/[A-Za-z0-9._ -]+|challenges\/schedule\.json)$/
+const ALLOWED_PATH = /^(?:real|ai)\/[A-Za-z0-9._ -]+$/
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const missingEnv = Object.entries({

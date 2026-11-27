@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { adminUpload, type GetToken } from './adminStorage'
+import type { GetToken } from './adminStorage'
 
 export type DailyScheduleEntry = {
   images: string[]
@@ -39,7 +39,6 @@ export type DailyRound = {
   filename: string
 }
 
-const SCHEDULE_PATH = 'challenges/schedule.json'
 const BUCKET = 'real-vs-ai'
 const SCORES_KEY = 'rvai_daily_scores'
 const TIME_LIMIT = 15
@@ -54,10 +53,10 @@ export function getTodayDate(): string {
   return `${yyyy}-${mm}-${dd}`
 }
 
-export async function fetchSchedule(): Promise<DailySchedule | null> {
+export async function fetchSchedule(today?: string): Promise<DailySchedule | null> {
   try {
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(SCHEDULE_PATH)
-    const res = await fetch(`${data.publicUrl}?t=${Date.now()}`)
+    const url = today ? `/api/daily-schedule?today=${encodeURIComponent(today)}` : '/api/daily-schedule'
+    const res = await fetch(url)
     if (!res.ok) return null
     const json = await res.json()
     return json as DailySchedule
@@ -66,14 +65,17 @@ export async function fetchSchedule(): Promise<DailySchedule | null> {
   }
 }
 
-export async function saveSchedule(schedule: DailySchedule, getToken: GetToken): Promise<boolean> {
-  try {
-    const blob = new Blob([JSON.stringify(schedule, null, 2)], { type: 'application/json' })
-    await adminUpload(getToken, SCHEDULE_PATH, blob, { contentType: 'application/json' })
-    return true
-  } catch {
-    return false
-  }
+export async function saveChallenge(date: string, images: string[] | null, getToken: GetToken): Promise<DailySchedule> {
+  const token = await getToken()
+  if (!token) throw new Error('Sign in again to edit the schedule.')
+  const res = await fetch('/api/daily-schedule', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ date, images }),
+  })
+  const result = await res.json()
+  if (!res.ok) throw new Error(result.error ?? 'Could not update the schedule.')
+  return result as DailySchedule
 }
 
 export function getDailyScores(): DailyScores {
